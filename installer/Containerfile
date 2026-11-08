@@ -1,0 +1,13 @@
+# Live environment: Fedora GNOME with Fedora's signed kernel.
+# The *installed* payload is the full RetroOS OCI image (including OGC).
+ARG LIVE_BASE=ghcr.io/ublue-os/silverblue-main:45
+FROM ${LIVE_BASE}
+
+ARG INSTALL_IMAGE_PAYLOAD
+COPY build.sh /usr/local/libexec/retro-os/build-live.sh
+COPY iso.yaml /usr/share/retro-os/iso.yaml
+
+RUN test -n "$INSTALL_IMAGE_PAYLOAD" && \
+    chmod 0755 /usr/local/libexec/retro-os/build-live.sh && \
+    INSTALL_IMAGE_PAYLOAD="$INSTALL_IMAGE_PAYLOAD" \
+    /usr/local/libexec/retro-os/build-live.sh

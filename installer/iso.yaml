@@ -1,0 +1,11 @@
+label: RetroOS-Live
+grub2:
+  default: 0
+  timeout: 5
+  entries:
+    - name: "Start RetroOS Live (GNOME / Installer)"
+      linux: "/images/pxeboot/vmlinuz quiet rhgb root=live:CDLABEL=RetroOS-Live rd.live.image"
+      initrd: "/images/pxeboot/initrd.img"
+    - name: "Start RetroOS Live (Basic graphics)"
+      linux: "/images/pxeboot/vmlinuz quiet root=live:CDLABEL=RetroOS-Live rd.live.image nomodeset"
+      initrd: "/images/pxeboot/initrd.img"

@@ -1,0 +1,87 @@
+name: Build RetroOS Live ISO
+
+on:
+  workflow_dispatch:
+    inputs:
+      image_tag:
+        description: "Published RetroOS OCI tag (must exist in GHCR)"
+        required: true
+        default: latest
+        type: string
+
+permissions:
+  contents: read
+  packages: read
+
+concurrency:
+  group: live-iso-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  live-iso:
+    runs-on: ubuntu-26.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Free build space
+        uses: ublue-os/remove-unwanted-software@695eb75bc387dbcd9685a8e72d23439d8686cba6
+
+      - name: Configure GHCR authentication for rootful Podman
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          printf '%s' "$GH_TOKEN" | sudo podman login ghcr.io \
+            --username "${{ github.actor }}" --password-stdin
+
+      - name: Resolve exact RetroOS payload
+        shell: bash
+        env:
+          IMAGE_TAG: ${{ inputs.image_tag }}
+        run: |
+          set -euo pipefail
+          image="ghcr.io/${GITHUB_REPOSITORY,,}:${IMAGE_TAG}"
+          sudo podman pull "$image"
+          digest="$(sudo podman image inspect "$image" --format '{{.Digest}}')"
+          test -n "$digest" && test "$digest" != '<none>'
+          echo "RETRO_PAYLOAD=ghcr.io/${GITHUB_REPOSITORY,,}@${digest}" >> "$GITHUB_ENV"
+
+      - name: Prepare Live ISO image
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo podman build \
+            --cap-add=sys_admin \
+            --security-opt=label=disable \
+            --build-arg "INSTALL_IMAGE_PAYLOAD=$RETRO_PAYLOAD" \
+            -t localhost/retro-os-live:build \
+            installer/
+
+      - name: Generate Live ISO with Titanoboa
+        id: iso
+        uses: ublue-os/titanoboa@5c457c3d0518bd17e754be0fd98a60d29d26abb4
+        with:
+          image-ref: localhost/retro-os-live:build
+          iso-dest: retro-os-live-amd64.iso
+
+      - name: Checksum and metadata
+        shell: bash
+        env:
+          ISO_PATH: ${{ steps.iso.outputs.iso-dest }}
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          cp "$ISO_PATH" dist/retro-os-live-amd64.iso
+          (cd dist && sha256sum retro-os-live-amd64.iso > SHA256SUMS)
+          printf '%s\n' "$RETRO_PAYLOAD" > dist/retro-os-image-ref.txt
+
+      - name: Upload Live ISO
+        uses: actions/upload-artifact@v4
+        with:
+          name: retro-os-live-amd64
+          path: dist/
+          if-no-files-found: error
+          retention-days: 3
+          compression-level: 0
