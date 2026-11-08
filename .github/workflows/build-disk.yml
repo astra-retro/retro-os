@@ -62,11 +62,26 @@ jobs:
           echo "Building QCOW2 from $digest"
 
       - name: Build QCOW2
-        uses: osbuild/image-builder-action@main
-        with:
-          image_type: qcow2
-          bootc_ref: ${{ steps.image.outputs.ref }}
-          bootc_default_fs: btrfs
+        shell: bash
+        env:
+          BOOTC_REF: ${{ steps.image.outputs.ref }}
+        run: |
+          set -euo pipefail
+
+          mkdir -p output
+
+          sudo podman run --rm --privileged \
+            --security-opt label=disable \
+            -v "$PWD/output:/output" \
+            -v /var/lib/containers/storage:/var/lib/containers/storage \
+            ghcr.io/osbuild/image-builder-cli:latest \
+            --bootc-ref "$BOOTC_REF" \
+            --bootc-default-fs btrfs \
+            build qcow2
+
+          sudo chown -R "$(id -u):$(id -g)" output
+
+          find output -type f -ls
 
       - name: Create SHA256 checksums
         shell: bash
