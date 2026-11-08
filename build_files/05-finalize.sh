@@ -20,7 +20,7 @@ desktop-file-edit --set-key=Hidden --set-value=true \
     /usr/share/applications/btop.desktop
 desktop-file-edit --set-key=Hidden --set-value=true \
     /usr/share/applications/yad-icon-browser.desktop
-rm /usr/share/applications/com.microsoft.edit.desktop
+rm -f /usr/share/applications/com.microsoft.edit.desktop
 
 # -- Configure Bluetooth input --
 echo "==> Configuring Bluetooth input..."
@@ -37,12 +37,7 @@ curl --fail --retry 3 --retry-all-errors -Lo /etc/flatpak/remotes.d/flathub.flat
 # -- Configure systemd services --
 echo "==> Configuring systemd services..."
 systemctl disable fw-fanctrl.service
-systemctl disable scx_loader.service
 systemctl enable input-remapper.service
-systemctl enable dev-hugepages1G.mount
-systemctl --global enable podman.socket
-systemctl --global enable systemd-tmpfiles-setup.service
 systemctl enable greenboot-healthcheck.service
 systemctl enable greenboot-set-rollback-trigger.service
-systemctl --global enable ntfs-nag.service
 systemctl enable bluetooth.service

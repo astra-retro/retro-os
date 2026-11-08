@@ -2,10 +2,6 @@
 
 set -ouex pipefail
 
-cp --archive --verbose --force \
-    /tmp/system_files/* \
-    /
-
 /ctx/01-install-kernel-akmods.sh
 /ctx/02-initialize.sh
 /ctx/03-global-remove.sh
@@ -13,3 +9,7 @@ cp --archive --verbose --force \
 /ctx/05-finalize.sh
 
 /ctx/reset-mtimes.sh
+
+cp --archive --verbose --force \
+    /tmp/system_files/overrides/* \
+    /

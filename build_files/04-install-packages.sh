@@ -17,10 +17,13 @@ dnf5 -y install \
 # -- Install core packages --
 echo "==> Installing core packages..."
 dnf5 -y install \
-    amdsmi \
-    bluez \
     bpfrag \
     bpftune \
+    framework-system \
+    game-devices-udev \
+    ScopeBuddy \
+    amdsmi \
+    bluez \
     btop \
     cage \
     cockpit-files \
@@ -37,11 +40,9 @@ dnf5 -y install \
     fira-code-fonts \
     fish \
     flatpak \
-    framework-system \
     fuse \
     fuse-libs \
     fw-fanctrl \
-    game-devices-udev \
     gamescope \
     git \
     glow \
@@ -51,7 +52,6 @@ dnf5 -y install \
     gum \
     i2c-tools \
     input-remapper \
-    inputattach-cec-units \
     jq \
     kernel-tools \
     ladspa-caps-plugins \
@@ -60,10 +60,8 @@ dnf5 -y install \
     libddcutil \
     libinput-utils \
     libxcrypt-compat \
-    linux-cec \
     linuxconsoletools \
     lm_sensors \
-    ls-iommu \
     lsb_release \
     lshw \
     lzip \
@@ -82,17 +80,12 @@ dnf5 -y install \
     rocm-opencl \
     rocm-smi \
     rsync \
-    ryzenadj \
-    ScopeBuddy \
-    scx-scheds \
-    scx-tools \
     twitter-twemoji-fonts \
     udica \
     unzip \
     usbip \
     v4l-utils \
     vim \
-    vulkan-low-latency-layer \
     vulkan-tools \
     wireplumber \
     yad \
@@ -104,7 +97,6 @@ dnf5 -y install \
 echo "==> Disabling unnecessary services..."
 ln -s /dev/null /etc/NetworkManager/dispatcher.d/04-iscsi
 systemctl mask iscsi
-systemctl mask systemd-remount-fs.service
 systemctl mask fedora-atomic-desktop-appstream-cache-refresh
 
 # -- Create autostart directory --
@@ -118,13 +110,7 @@ dnf5 -y install \
     nautilus-gsconnect \
     gnome-shell-extension-user-theme \
     gnome-shell-extension-gsconnect \
-    gnome-search-yafti \
     rom-properties-gtk4 \
     ibus-mozc \
     openssh-askpass \
     firewall-config
-
-# -- Enable dconf-update service --
-# Enable the dconf-update service for configuration persistence.
-echo "==> Enabling dconf-update service..."
-systemctl enable dconf-update.service

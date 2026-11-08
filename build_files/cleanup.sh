@@ -7,9 +7,7 @@ set -xeuo pipefail
 # -- Remove temporary files --
 # Clear all contents of /tmp to reclaim space used by temporary data.
 rm -rf /tmp/* || true
-find /var/* -maxdepth 0 -type d \! -name cache -exec rm -fr {} \;
-mkdir -p /var/tmp
-chmod -R 1777 /var/tmp
+install -d -m 1777 /var/tmp
 
 # -- Remove DNF5 log file --
 # Delete the DNF5 package manager log if it exists.

@@ -9,6 +9,7 @@ trap 'echo "::endgroup::"' EXIT
 
 # Set image identifiers, URLs, and branding constants.
 IMAGE_PRETTY_NAME="Retro OS"
+IMAGE_ID="retro-os"
 IMAGE_LIKE="fedora"
 
 IMAGE_INFO="/usr/share/ublue-os/image-info.json"
@@ -45,15 +46,15 @@ tee /usr/lib/os-release <<EOF
 NAME="${IMAGE_PRETTY_NAME}"
 VERSION="${VERSION_TAG} (${BASE_IMAGE_NAME^})"
 RELEASE_TYPE=${RELEASE_TYPE}
-ID=${IMAGE_PRETTY_NAME,}
+ID=${IMAGE_ID}
 ID_LIKE="${IMAGE_LIKE}"
 VERSION_ID=${VERSION_ID}
 VERSION_CODENAME="${BASE_IMAGE_NAME^}"
 PRETTY_NAME="${IMAGE_PRETTY_NAME}"
 ANSI_COLOR="0;38;2;138;43;226"
 LOGO=retro-os-logo
-CPE_NAME="cpe:/o:universal-blue:${IMAGE_PRETTY_NAME,}:${FEDORA_VERSION}"
-DEFAULT_HOSTNAME="${IMAGE_PRETTY_NAME,}"
+CPE_NAME="cpe:/o:astra-retro:retro-os:${FEDORA_VERSION}"
+DEFAULT_HOSTNAME="${IMAGE_ID}"
 HOME_URL="https://github.com/astra-retro/retro-os"
 DOCUMENTATION_URL="https://github.com/astra-retro/retro-os"
 SUPPORT_URL="https://github.com/astra-retro/retro-os/issues/"
@@ -61,7 +62,7 @@ BUG_REPORT_URL="https://github.com/astra-retro/retro-os/issues/"
 SUPPORT_END=${SUPPORT_END}
 VARIANT="${VARIANT}"
 VARIANT_ID=${IMAGE_NAME}
-OSTREE_VERSION='${VERSION_TAG}'
+OSTREE_VERSION="${VERSION_TAG}"
 BUILD_ID="${VERSION_PRETTY}"
 BOOTLOADER_NAME="${IMAGE_PRETTY_NAME} ${VERSION_PRETTY}"
 IMAGE_ID="${IMAGE_NAME}-${VERSION_TAG}"
