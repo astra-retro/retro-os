@@ -27,14 +27,19 @@ jobs:
       - name: Free build space
         uses: ublue-os/remove-unwanted-software@695eb75bc387dbcd9685a8e72d23439d8686cba6
 
-      - name: Configure GHCR authentication for rootful Podman
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4.8.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Configure authentication for rootful Podman
         shell: bash
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          printf '%s' "$GH_TOKEN" | sudo podman login ghcr.io \
-            --username "${{ github.actor }}" --password-stdin
+          sudo install -d -m 0700 /root/.docker
+          sudo install -m 0600 "$HOME/.docker/config.json" /root/.docker/config.json
 
       - name: Resolve exact RetroOS payload
         shell: bash
@@ -55,6 +60,7 @@ jobs:
           sudo podman build \
             --cap-add=sys_admin \
             --security-opt=label=disable \
+            --secret id=ghcr-auth,src=/root/.docker/config.json \
             --build-arg "INSTALL_IMAGE_PAYLOAD=$RETRO_PAYLOAD" \
             -t localhost/retro-os-live:build \
             installer/

@@ -7,7 +7,9 @@ ARG INSTALL_IMAGE_PAYLOAD
 COPY build.sh /usr/local/libexec/retro-os/build-live.sh
 COPY iso.yaml /usr/share/retro-os/iso.yaml
 
-RUN test -n "$INSTALL_IMAGE_PAYLOAD" && \
+RUN --mount=type=secret,id=ghcr-auth \
+    REGISTRY_AUTH_FILE=/run/secrets/ghcr-auth && \
+    test -n "$INSTALL_IMAGE_PAYLOAD" && \
     chmod 0755 /usr/local/libexec/retro-os/build-live.sh && \
     INSTALL_IMAGE_PAYLOAD="$INSTALL_IMAGE_PAYLOAD" \
     /usr/local/libexec/retro-os/build-live.sh

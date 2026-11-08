@@ -14,7 +14,7 @@ dnf5 -y install \
 
 # Embed payload for offline Anaconda installation.
 # IMPORTANT: package source is an OCI digest, not a moving :latest tag.
-podman pull "$INSTALL_IMAGE_PAYLOAD"
+podman pull --authfile "${REGISTRY_AUTH_FILE}" "$INSTALL_IMAGE_PAYLOAD"
 podman image exists "$INSTALL_IMAGE_PAYLOAD"
 
 install -d /usr/share/anaconda /usr/share/applications /usr/lib/bootc-image-builder

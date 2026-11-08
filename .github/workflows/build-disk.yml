@@ -62,7 +62,7 @@ jobs:
           echo "Building QCOW2 from $digest"
 
       - name: Build QCOW2
-        uses: osbuild/image-builder-action@v1
+        uses: osbuild/image-builder-action@main
         with:
           image_type: qcow2
           bootc_ref: ${{ steps.image.outputs.ref }}
