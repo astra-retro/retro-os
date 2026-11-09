@@ -32,6 +32,14 @@ cat > /etc/dconf/db/local.d/20-astra-retro-os <<'DCONF'
 picture-uri='file:///usr/share/backgrounds/astra-retro-os/wallpaper.png'
 picture-uri-dark='file:///usr/share/backgrounds/astra-retro-os/wallpaper.png'
 picture-options='zoom'
+
+# Fedora's GNOME Background Logo extension overlays the logo in the corner.
+# Replace its Fedora defaults with the shared Astra logo in both themes.
+[org/fedorahosted/background-logo-extension]
+logo-file='/usr/share/icons/hicolor/scalable/apps/astra-retro-os.svg'
+logo-file-dark='/usr/share/icons/hicolor/scalable/apps/astra-retro-os.svg'
+logo-position='bottom-right'
+logo-always-visible=true
 DCONF
 # Do not replace an existing user dconf profile; ensure its local database is reachable.
 install -d /etc/dconf/profile
