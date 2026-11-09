@@ -13,9 +13,35 @@ dnf5 -y install \
     squashfs-tools xorriso jq podman
 
 dnf5 -y install plymouth-plugin-script dconf ptyxis
+# French translations and locale data are needed in the Live environment.
+dnf5 -y install glibc-langpack-fr langpacks-fr
 bash /usr/share/retro-os/branding/install-common.sh /usr/share/retro-os/branding/assets live
 bash /usr/share/retro-os/branding/install-live.sh /usr/share/retro-os/branding/live
 
+# French defaults for the Live ISO only. The installed bootc OCI payload is untouched.
+# Write files directly: systemd-localed is not running during the container build.
+install -d /etc/X11/xorg.conf.d /etc/dconf/db/local.d
+printf 'LANG=fr_FR.UTF-8\n' > /etc/locale.conf
+printf 'KEYMAP=fr\n' > /etc/vconsole.conf
+cat > /etc/X11/xorg.conf.d/00-keyboard.conf <<'XKB'
+Section "InputClass"
+    Identifier "system-keyboard"
+    MatchIsKeyboard "on"
+    Option "XkbLayout" "fr"
+EndSection
+XKB
+cat > /etc/dconf/db/local.d/30-astra-live-keyboard <<'DCONF'
+[org/gnome/desktop/input-sources]
+sources=[('xkb', 'fr')]
+xkb-options=[]
+DCONF
+dconf update
+
+# Refuse to publish a Live image with an unavailable locale.
+locale -a | grep -Ei '^fr_FR\.utf-?8$' >/dev/null || {
+  echo 'ERROR: French locale unavailable in the Live image' >&2
+  exit 1
+}
 # Embed payload for offline Anaconda installation.
 # IMPORTANT: package source is an OCI digest, not a moving :latest tag.
 podman pull --authfile "${REGISTRY_AUTH_FILE}" "$INSTALL_IMAGE_PAYLOAD"
