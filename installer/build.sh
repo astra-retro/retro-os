@@ -25,18 +25,6 @@ install -d /usr/share/anaconda /usr/share/applications /usr/lib/bootc-image-buil
 printf '\nostreecontainer --url=%s --transport=containers-storage --no-signature-verification\n' \
   "$INSTALL_IMAGE_PAYLOAD" >> /usr/share/anaconda/interactive-defaults.ks
 
-# Show a launcher on the GNOME live desktop; do not auto-run an installer.
-cat > /usr/share/applications/retro-os-install.desktop <<'DESKTOP'
-[Desktop Entry]
-Type=Application
-Name=Install RetroOS
-Comment=Install RetroOS on a disk
-Exec=liveinst
-Icon=system-software-install
-Terminal=false
-Categories=System;
-DESKTOP
-
 # Live session login, desktop, and initramfs.
 if [[ -e /etc/sysconfig/livesys ]]; then
     sed -i 's/^livesys_session=.*/livesys_session=gnome/' /etc/sysconfig/livesys

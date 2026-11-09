@@ -1,10 +1,34 @@
-# Static background. Requires Plymouth script plugin.
-image = Image("plymouth-splash.png");
-sprite = Sprite();
-sprite.SetImage(image);
-sprite.SetZ(-100);
+# Astra Retro OS - Plymouth splash with animated neon spinner.
+# Background remains unchanged. A 96x96 cyan/magenta ring spins below center.
+background_image = Image("plymouth-splash.png");
+background_sprite = Sprite(background_image);
+background_sprite.SetZ(-100);
+
+spinner_image = Image("spinner.png");
+spinner_frame_image = spinner_image;
+spinner_sprite = Sprite(spinner_frame_image);
+spinner_sprite.SetZ(100);
+
+spinner_tick = 0;
+spinner_frame = 0;
+
 fun refresh_callback () {
-  sprite.SetX((Window.GetWidth() - image.GetWidth()) / 2);
-  sprite.SetY((Window.GetHeight() - image.GetHeight()) / 2);
+  # Recenter on display changes.
+  background_sprite.SetX((Window.GetWidth() - background_image.GetWidth()) / 2);
+  background_sprite.SetY((Window.GetHeight() - background_image.GetHeight()) / 2);
+
+  # Refresh happens repeatedly; rotate one step every third callback.
+  # This is an indeterminate indicator, not an estimate of boot progress.
+  spinner_tick = spinner_tick + 1;
+  if (spinner_tick >= 3) {
+    spinner_tick = 0;
+    spinner_frame = (spinner_frame + 1) % 24;
+    spinner_frame_image = spinner_image.Rotate((2 * Math.Pi * spinner_frame) / 24);
+    spinner_sprite.SetImage(spinner_frame_image);
+  }
+
+  spinner_sprite.SetX((Window.GetWidth() - spinner_frame_image.GetWidth()) / 2);
+  spinner_sprite.SetY(Window.GetHeight() * 0.74 - spinner_frame_image.GetHeight() / 2);
 }
+
 Plymouth.SetRefreshFunction(refresh_callback);
