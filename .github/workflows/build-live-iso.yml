@@ -22,7 +22,7 @@ jobs:
     runs-on: ubuntu-26.04
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Free build space
         uses: ublue-os/remove-unwanted-software@695eb75bc387dbcd9685a8e72d23439d8686cba6
@@ -84,7 +84,7 @@ jobs:
           printf '%s\n' "$RETRO_PAYLOAD" > dist/retro-os-image-ref.txt
 
       - name: Upload Live ISO
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: retro-os-live-amd64
           path: dist/

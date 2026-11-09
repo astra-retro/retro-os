@@ -66,10 +66,44 @@ if (( ${#kernels[@]} != 1 )); then
   exit 1
 fi
 kernel="${kernels[0]}"
-DRACUT_NO_XATTR=1 dracut --force --zstd --reproducible --no-hostonly \
-  --add 'dmsquash-live dmsquash-live-autooverlay' \
-  "/usr/lib/modules/${kernel}/initramfs.img" "$kernel"
 
-install -m 0644 /usr/share/retro-os/iso.yaml /usr/lib/bootc-image-builder/iso.yaml
+# Generate the generic Fedora Live initramfs.
+initramfs="/usr/lib/modules/${kernel}/initramfs.img"
+
+DRACUT_NO_XATTR=1 dracut \
+  --force \
+  --verbose \
+  --zstd \
+  --reproducible \
+  --no-hostonly \
+  --add 'dmsquash-live dmsquash-live-autooverlay' \
+  "$initramfs" "$kernel"
+
+# Fail if the initramfs is missing or empty.
+test -s "$initramfs" || {
+  echo "ERROR: Live initramfs was not generated" >&2
+  exit 1
+}
+
+# Verify that Dracut generated a readable archive.
+lsinitrd "$initramfs" >/dev/null || {
+  echo "ERROR: Cannot read generated initramfs" >&2
+  exit 1
+}
+
+# Verify required Live boot components.
+for module in dmsquash-live dmsquash-live-autooverlay; do
+  if ! lsinitrd -m "$initramfs" | grep -Fq "$module"; then
+    echo "ERROR: Missing Dracut module: $module" >&2
+    exit 1
+  fi
+done
+
+echo "Live initramfs successfully validated:"
+ls -lh "$initramfs"
+
+install -m 0644 \
+  /usr/share/retro-os/iso.yaml \
+  /usr/lib/bootc-image-builder/iso.yaml
 
 dnf5 clean all
