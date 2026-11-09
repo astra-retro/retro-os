@@ -34,7 +34,7 @@ XKB
 cat > /etc/dconf/db/local.d/30-astra-live-keyboard <<'DCONF'
 [org/gnome/desktop/input-sources]
 sources=[('xkb', 'fr')]
-xkb-options=[]
+xkb-options=@as []
 DCONF
 dconf update
 
