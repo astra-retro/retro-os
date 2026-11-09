@@ -62,6 +62,16 @@ if [[ -f "$release" ]]; then
   fi
 fi
 
+# Fedora's GNOME Settings About page may use a distributor logo compiled
+# into gnome-control-center, instead of resolving LOGO= from os-release.
+# Fedora's light and dark assets are provided by the fedora-logos package.
+# Install our common Astra logo at those expected paths in both OCI images.
+# Run this after package installation so the Fedora RPM does not restore them.
+install -d /usr/share/pixmaps
+for settings_logo in fedora_logo_med.png fedora_whitelogo_med.png; do
+  install -m 0644 "$assets/astra-retro-os-logo.png" "/usr/share/pixmaps/$settings_logo"
+done
+
 command -v plymouth-set-default-theme >/dev/null || { echo 'plymouth required' >&2; exit 1; }
 plymouth-set-default-theme astra-retro-os
 printf 'Astra branding installed (%s)\n' "$mode"
