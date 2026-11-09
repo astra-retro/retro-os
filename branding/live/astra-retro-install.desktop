@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=Install Astra Retro OS
+Name[fr]=Installer Astra Retro OS
+Comment=Install Astra Retro OS to a disk
+Comment[fr]=Installer Astra Retro OS sur un disque
+Exec=liveinst
+Icon=astra-retro-os
+Terminal=false
+Categories=System;
+StartupNotify=true

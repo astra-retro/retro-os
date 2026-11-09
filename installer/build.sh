@@ -12,6 +12,10 @@ dnf5 -y install \
     grub2-efi-x64-cdboot grub2-pc-modules \
     squashfs-tools xorriso jq podman
 
+dnf5 -y install plymouth-plugin-script dconf ptyxis
+bash /usr/share/retro-os/branding/install-common.sh /usr/share/retro-os/branding/assets live
+bash /usr/share/retro-os/branding/install-live.sh /usr/share/retro-os/branding/live
+
 # Embed payload for offline Anaconda installation.
 # IMPORTANT: package source is an OCI digest, not a moving :latest tag.
 podman pull --authfile "${REGISTRY_AUTH_FILE}" "$INSTALL_IMAGE_PAYLOAD"

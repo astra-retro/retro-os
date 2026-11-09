@@ -12,6 +12,9 @@ FROM ghcr.io/ublue-os/akmods:${KERNEL_FLAVOR}-${FEDORA_VERSION}-${KERNEL_VERSION
 FROM ghcr.io/ublue-os/akmods-extra:${KERNEL_FLAVOR}-${FEDORA_VERSION}-${KERNEL_VERSION} AS akmods-extra
 FROM ghcr.io/ublue-os/akmods-${NVIDIA_FLAVOR}:${KERNEL_FLAVOR}-${FEDORA_VERSION}-${KERNEL_VERSION} AS akmods-nvidia
 
+FROM scratch AS branding_assets
+COPY branding /
+
 FROM scratch AS ctx
 COPY build_files /
 
@@ -50,8 +53,11 @@ RUN --mount=type=cache,dst=/var/cache \
 RUN --mount=type=cache,dst=/var/cache \
       --mount=type=cache,dst=/var/log \
       --mount=type=bind,from=ctx,source=/,target=/ctx \
+      --mount=type=bind,from=branding_assets,source=/,target=/astra-branding \
       --mount=type=tmpfs,dst=/tmp \
       /ctx/image-info.sh \
+      && dnf5 -y install plymouth-plugin-script dconf \
+      && bash /astra-branding/install-common.sh /astra-branding/assets installed \
       && /ctx/build-initramfs.sh \
       && /ctx/finalize.sh \
       && /ctx/cleanup.sh

@@ -43,6 +43,7 @@ DRACUT_NO_XATTR=1 /usr/bin/dracut \
     -v \
     --add ostree \
     --add fido2 \
+    --add plymouth \
     -f "${INITRAMFS}"
 
 # Copy back to preserve the original os-release permissions.

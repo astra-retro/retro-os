@@ -1,0 +1,8 @@
+[Plymouth Theme]
+Name=Astra Retro OS
+Description=Astra Retro OS Live splash
+ModuleName=script
+
+[script]
+ImageDir=/usr/share/plymouth/themes/astra-retro-os
+ScriptFile=/usr/share/plymouth/themes/astra-retro-os/astra-retro-os.script

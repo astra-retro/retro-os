@@ -63,8 +63,8 @@ jobs:
             --secret id=ghcr-auth,src=/root/.docker/config.json \
             --build-arg "INSTALL_IMAGE_PAYLOAD=$RETRO_PAYLOAD" \
             -t localhost/retro-os-live:build \
-            installer/
-
+            -f installer/Containerfile \
+            .
       - name: Generate Live ISO with Titanoboa
         id: iso
         uses: ublue-os/titanoboa@5c457c3d0518bd17e754be0fd98a60d29d26abb4

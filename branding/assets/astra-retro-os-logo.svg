@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+<defs>
+ <linearGradient id="orbit" x1="0" y1="1" x2="1" y2="0"><stop offset="0" stop-color="#00D6FF"/><stop offset=".65" stop-color="#9B5CFF"/><stop offset="1" stop-color="#FF00CC"/></linearGradient>
+ <linearGradient id="astral" x1="0" y1="0" x2=".5" y2="1"><stop stop-color="#F6F3FF"/><stop offset="1" stop-color="#B7AEFF"/></linearGradient>
+</defs>
+<rect x="12" y="12" width="488" height="488" rx="110" fill="#090A20" stroke="#9B5CFF" stroke-width="5"/>
+<path d="M 72 310 C 130 200 368 188 438 272 C 467 308 426 341 386 347" fill="none" stroke="url(#orbit)" stroke-width="23" stroke-linecap="round"/>
+<path d="M 150 352 L 273 82 L 375 355 L 292 268 L 243 268 Z" fill="url(#astral)" stroke="#1A0B3F" stroke-width="6"/>
+<path d="M 119 412 Q 113 385 144 383 L 192 383 Q 211 367 229 383 L 279 383 Q 304 383 302 411 L 285 436 Q 275 447 257 430 L 235 415 L 206 415 L 175 435 Q 158 448 145 435 Z" fill="#110B34" stroke="url(#orbit)" stroke-width="7"/>
+<path d="M 169 393 V 420 M 156 406 H 182" stroke="#00D6FF" stroke-width="8" stroke-linecap="round"/>
+<circle cx="254" cy="396" r="7" fill="#FF00CC"/><circle cx="277" cy="409" r="7" fill="#FF00CC"/>
+<path d="M 377 135 l 9 23 23 9 -23 9 -9 23 -9 -23 -23 -9 23 -9Z" fill="#FFFFFF"/>
+<path d="M 118 139 l 5 15 15 5 -15 5 -5 15 -5 -15 -15 -5 15 -5Z" fill="#00D6FF"/>
+</svg>

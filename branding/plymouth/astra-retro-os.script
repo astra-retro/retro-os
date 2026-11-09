@@ -1,0 +1,10 @@
+# Static background. Requires Plymouth script plugin.
+image = Image("plymouth-splash.png");
+sprite = Sprite();
+sprite.SetImage(image);
+sprite.SetZ(-100);
+fun refresh_callback () {
+  sprite.SetX((Window.GetWidth() - image.GetWidth()) / 2);
+  sprite.SetY((Window.GetHeight() - image.GetHeight()) / 2);
+}
+Plymouth.SetRefreshFunction(refresh_callback);

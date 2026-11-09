@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=Terminal
+Name[fr]=Terminal
+Comment=Open a terminal
+Exec=ptyxis
+Icon=org.gnome.Ptyxis
+Terminal=false
+Categories=System;Utility;
+StartupNotify=true
