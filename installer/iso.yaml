@@ -4,8 +4,9 @@ grub2:
   timeout: 5
   entries:
     - name: "Start RetroOS Live (GNOME / Installer)"
-      linux: "/images/pxeboot/vmlinuz quiet rhgb root=live:CDLABEL=RetroOS-Live rd.live.image"
+      linux: "/images/pxeboot/vmlinuz quiet rhgb root=live:CDLABEL=RetroOS-Live rd.live.image enforcing=0"
       initrd: "/images/pxeboot/initrd.img"
-    - name: "Start RetroOS Live (Basic graphics)"
-      linux: "/images/pxeboot/vmlinuz quiet root=live:CDLABEL=RetroOS-Live rd.live.image nomodeset"
+
+    - name: "Start RetroOS Live (Debug)"
+      linux: "/images/pxeboot/vmlinuz root=live:CDLABEL=RetroOS-Live rd.live.image enforcing=0 plymouth.enable=0 systemd.show_status=1 loglevel=7"
       initrd: "/images/pxeboot/initrd.img"
