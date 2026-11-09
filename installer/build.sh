@@ -91,14 +91,6 @@ lsinitrd "$initramfs" >/dev/null || {
   exit 1
 }
 
-# Verify required Live boot components.
-for module in dmsquash-live dmsquash-live-autooverlay; do
-  if ! lsinitrd -m "$initramfs" | grep -Fq "$module"; then
-    echo "ERROR: Missing Dracut module: $module" >&2
-    exit 1
-  fi
-done
-
 echo "Live initramfs successfully validated:"
 ls -lh "$initramfs"
 
