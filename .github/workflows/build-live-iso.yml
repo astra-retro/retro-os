@@ -65,12 +65,33 @@ jobs:
             -t localhost/retro-os-live:build \
             -f installer/Containerfile \
             .
-      - name: Generate Live ISO with Titanoboa
+      - name: Generate branded Live ISO
         id: iso
-        uses: ublue-os/titanoboa@5c457c3d0518bd17e754be0fd98a60d29d26abb4
-        with:
-          image-ref: localhost/retro-os-live:build
-          iso-dest: retro-os-live-amd64.iso
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          background="$GITHUB_WORKSPACE/branding/assets/grub-background.png"
+          test -s "$background" || {
+            echo "::error::Missing GRUB wallpaper: $background"
+            exit 1
+          }
+          mkdir -p output
+
+          sudo podman run --rm \
+            --cap-add=sys_admin \
+            --security-opt=label=disable \
+            -v "$PWD/output:/output" \
+            -v "$PWD/installer/titanoboa/build_iso_branded.sh:/src/build_iso.sh:ro" \
+            -v "$background:/src/grub-background.png:ro" \
+            --mount type=image,source=localhost/retro-os-live:build,dst=/rootfs \
+            quay.io/fedora/fedora:45 \
+            /bin/bash /src/build_iso.sh
+
+          test -s output/RetroOS-Live.iso
+          sudo chown -R "$(id -u):$(id -g)" output
+          mv output/RetroOS-Live.iso retro-os-live-amd64.iso
+          echo "iso-dest=retro-os-live-amd64.iso" >> "$GITHUB_OUTPUT"
 
       - name: Checksum and metadata
         shell: bash
