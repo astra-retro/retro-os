@@ -10,7 +10,8 @@ dnf5 -y install \
     libblockdev-btrfs libblockdev-lvm libblockdev-dm \
     dracut-live livesys-scripts \
     grub2-efi-x64-cdboot grub2-pc-modules \
-    squashfs-tools xorriso jq podman
+    squashfs-tools xorriso jq podman \
+    gnome-shell-extension-dash-to-dock
 
 dnf5 -y install plymouth-plugin-script dconf ptyxis
 # French translations and locale data are needed in the Live environment.
