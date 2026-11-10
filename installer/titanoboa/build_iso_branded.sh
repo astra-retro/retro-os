@@ -49,13 +49,11 @@ if [[ -d /work/iso-root/boot/grub2/x86_64-efi ]]; then
   cp -a /work/iso-root/boot/grub2/x86_64-efi/. /work/EFI/BOOT/x86_64-efi/
 fi
 
-# Put the image directly on the ISO and the EFI partition. A PNG inside
-# /LiveOS/squashfs.img or /usr/share is NOT accessible to GRUB at this stage.
+# GRUB may keep $root on the EFI FAT partition or switch it to the ISO.
+# Provide the background at the SAME absolute path in both filesystems.
+# The ISO copy below is made when /work/EFI is copied to /work/iso-root/EFI.
 install -Dm0644 "$background" /work/iso-root/boot/grub2/astra-background.png
-for dir in /work/EFI/*; do
-  [[ -d "$dir" ]] || continue
-  install -m 0644 "$background" "$dir/astra-background.png"
-done
+install -Dm0644 "$background" /work/EFI/BOOT/astra-background.png
 
 # Without a GRUB PF2 font, graphical borders can appear as rectangles
 # filled with '?' characters. The previous builder loaded the font BEFORE
@@ -121,7 +119,9 @@ set menu_color_highlight=black/light-cyan
 # Explicitly draw the splash *before* the boot timeout. GRUB's default hidden
 # timeout can clear the graphical screen on some EFI firmwares; an interruptible
 # sleep keeps the picture displayed and switches to an indefinite menu on ESC.
-if background_image -m stretch /boot/grub2/astra-background.png; then
+# Both the ISO and the EFI FAT partition contain this exact path. The
+# older /boot/grub2 path existed ONLY on the ISO, not on the EFI partition.
+if background_image -m stretch /EFI/BOOT/astra-background.png; then
   if insmod sleep; then
     if sleep --interruptible 5; then
       set timeout=0
@@ -134,7 +134,8 @@ if background_image -m stretch /boot/grub2/astra-background.png; then
     set timeout=5
   fi
 else
-  # Safe fallback: don't hide the menu if GRUB cannot render our background.
+  # Keep the system bootable and show the normal menu if graphics fail.
+  echo 'Astra Retro OS: GRUB background unavailable; showing boot menu.'
   set timeout=5
 fi
 EOF
@@ -165,13 +166,17 @@ mcopy -v -i /work/uefi.img -s /work/EFI ::
 # Fail early if the expected files are not in the EFI FAT filesystem.
 mdir -i /work/uefi.img ::/EFI/BOOT/astra-background.png
 mdir -i /work/uefi.img ::/EFI/BOOT/grub.cfg
+# Verify that the ISO and EFI filesystem copies are identical to the source.
+cmp -s "$background" /work/iso-root/boot/grub2/astra-background.png
+cmp -s "$background" /work/iso-root/EFI/BOOT/astra-background.png
+cmp -s "$background" /work/EFI/BOOT/astra-background.png
 mdir -i /work/uefi.img ::/EFI/BOOT/fonts/unicode.pf2
 mdir -i /work/uefi.img ::/EFI/BOOT/x86_64-efi/gfxterm_background.mod
 mdir -i /work/uefi.img ::/EFI/BOOT/x86_64-efi/png.mod
 
 a=$(test -s /work/iso-root/boot/grub2/astra-background.png && echo yes)
 [[ "$a" == yes ]]
-grep -q 'background_image.*astra-background.png' /work/iso-root/boot/grub2/grub.cfg
+grep -Fq 'background_image -m stretch /EFI/BOOT/astra-background.png' /work/iso-root/boot/grub2/grub.cfg
 
 xorriso -as mkisofs \
   -R \
