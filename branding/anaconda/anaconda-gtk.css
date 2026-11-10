@@ -1,0 +1,40 @@
+/* Astra Retro OS — classic GTK Anaconda, without changing GNOME's theme. */
+@define-color astra_banner #DEBDF2;
+@define-color astra_text #441C60;
+@define-color astra_action #9454C4;
+@define-color astra_action_hover #AD4C98;
+@define-color product_bg_color @astra_banner;
+
+/* Remove Fedora's blue texture/background in the installation header. */
+AnacondaSpokeWindow #nav-box,
+AnacondaHubWindow #nav-box {
+    background-image: none;
+    background-color: @astra_banner;
+    color: @astra_text;
+}
+
+/* Use a small rendition of our existing logo in the header and logo widgets. */
+AnacondaSpokeWindow #nav-box .logo,
+AnacondaHubWindow #nav-box .logo,
+AnacondaSpokeWindow #nav-box .product-logo,
+AnacondaHubWindow #nav-box .product-logo,
+.logo-sidebar .logo {
+    background-image: url('/usr/share/anaconda/pixmaps/astra-anaconda-logo.png');
+    background-size: contain;
+    background-position: left center;
+    background-repeat: no-repeat;
+}
+
+/* Affect only Anaconda's suggested actions, not global GNOME GTK buttons. */
+AnacondaSpokeWindow button.suggested-action,
+AnacondaHubWindow button.suggested-action {
+    background-image: none;
+    background-color: @astra_action;
+    border-color: @astra_action;
+    color: #FFFFFF;
+}
+AnacondaSpokeWindow button.suggested-action:hover,
+AnacondaHubWindow button.suggested-action:hover {
+    background-color: @astra_action_hover;
+    border-color: @astra_action_hover;
+}

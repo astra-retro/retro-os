@@ -1,0 +1,45 @@
+/* Astra Retro OS: installer-only branding, PatternFly 6 and 5 fallback. */
+.anaconda {
+    --brand-default-light: #D8B4FE;
+    --brand-default: #9454C4;
+    --brand-default-dark: #7835A6;
+    --pf-t--global--color--brand--default: #9454C4;
+    --pf-t--global--color--brand--hover: #7835A6;
+    --pf-global--primary-color--100: #9454C4;
+    --pf-global--primary-color--200: #7835A6;
+}
+
+/* Replace the Fedora mark in the top-left header with the existing Astra PNG. */
+.anaconda .logo {
+    background-image: url('astra-anaconda-logo.png') !important;
+    background-position: left center;
+    background-size: contain;
+    background-repeat: no-repeat;
+}
+
+/* Header: pastel lilac with dark text, keeping the buttons readable. */
+.anaconda .pf-v6-c-page__header,
+.anaconda .pf-v5-c-page__header {
+    background-color: #DEBDF2;
+    color: #441C60;
+}
+
+/* Purple primary actions; rose focus and hover accents. */
+.anaconda .pf-v6-c-button.pf-m-primary:not(:disabled):not([aria-disabled='true']),
+.anaconda .pf-v5-c-button.pf-m-primary:not(:disabled):not([aria-disabled='true']) {
+    background-color: #9454C4;
+    color: #FFFFFF;
+}
+.anaconda .pf-v6-c-button.pf-m-primary:hover:not(:disabled),
+.anaconda .pf-v5-c-button.pf-m-primary:hover:not(:disabled) {
+    background-color: #AD4C98;
+}
+.anaconda :focus-visible {
+    outline-color: #DB64B1;
+}
+
+/* PatternFly 6 uses different token values in the dark theme. */
+.pf-v6-theme-dark .anaconda {
+    --pf-t--global--color--brand--default: #D8B4FE;
+    --pf-t--global--color--brand--hover: #9454C4;
+}

@@ -3,6 +3,10 @@ set -euo pipefail
 
 src="${1:?Provide Live launcher directory}"
 
+# Apply Anaconda-only branding after anaconda-live is installed.
+# This leaves the GNOME launcher, wallpaper and installed OS untouched.
+bash "$(dirname "${BASH_SOURCE[0]}")/anaconda/install.sh"
+
 # Dash to Dock is a Fedora RPM, installed in installer/build.sh.
 # Fail during the image build rather than shipping an invisible dock.
 test -d /usr/share/gnome-shell/extensions/dash-to-dock@micxgx.gmail.com || {
