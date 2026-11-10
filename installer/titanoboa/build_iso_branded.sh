@@ -8,7 +8,8 @@
 # boot image, so GRUB can access the background before the Linux LiveOS mounts.
 set -euo pipefail
 
-dnf5 install -qy squashfs-tools xorriso yq mtools dosfstools
+dnf5 install -qy squashfs-tools xorriso yq mtools dosfstools \
+  grub2-efi-x64-modules grub2-tools-extra dejavu-sans-fonts
 
 mkdir -p /work/iso-root/boot/grub2 /work/iso-root/images/pxeboot /work/iso-root/LiveOS
 cd /work
@@ -26,14 +27,27 @@ iso_label=$(yq '.label' < "$config")
 cp -av /rootfs/usr/lib/modules/*/initramfs.img /work/iso-root/images/pxeboot/initrd.img
 cp -av /rootfs/usr/lib/modules/*/vmlinuz /work/iso-root/images/pxeboot/vmlinuz
 
-# Preserve upstream Titanoboa's boot modules and EFI binaries.
-for arch in i386-pc arm64-efi; do
-  if [[ -d "/rootfs/usr/lib/grub/$arch" ]]; then
-    mkdir -p "/work/iso-root/boot/grub2/$arch"
-    cp -avT "/rootfs/usr/lib/grub/$arch" "/work/iso-root/boot/grub2/$arch"
+# Keep the upstream EFI boot binaries; make external GRUB modules available
+# from both the ISO filesystem and the EFI system partition. This fixes missing
+# gfxterm_background/png modules on UEFI installations where GRUB loads from FAT.
+for arch in i386-pc arm64-efi x86_64-efi; do
+  source_modules="/rootfs/usr/lib/grub/$arch"
+  if [[ ! -d "$source_modules" && -d "/usr/lib/grub/$arch" ]]; then
+    source_modules="/usr/lib/grub/$arch"
+  fi
+  if [[ -d "$source_modules" ]]; then
+    install -d "/work/iso-root/boot/grub2/$arch"
+    cp -a "$source_modules/." "/work/iso-root/boot/grub2/$arch/"
   fi
 done
 cp -avT /rootfs/boot/efi/EFI /work/EFI
+
+# The EFI binary normally uses EFI/BOOT as $prefix. Its modules need to be
+# accessible at EFI/BOOT/x86_64-efi in addition to the ISO GRUB directory.
+if [[ -d /work/iso-root/boot/grub2/x86_64-efi ]]; then
+  install -d /work/EFI/BOOT/x86_64-efi
+  cp -a /work/iso-root/boot/grub2/x86_64-efi/. /work/EFI/BOOT/x86_64-efi/
+fi
 
 # Put the image directly on the ISO and the EFI partition. A PNG inside
 # /LiveOS/squashfs.img or /usr/share is NOT accessible to GRUB at this stage.
@@ -43,42 +57,85 @@ for dir in /work/EFI/*; do
   install -m 0644 "$background" "$dir/astra-background.png"
 done
 
-# gfxterm needs a font on many GRUB builds.
-for source in \
+# Without a GRUB PF2 font, graphical borders can appear as rectangles
+# filled with '?' characters. The previous builder loaded the font BEFORE
+# `search --set=root` and never copied it into the EFI FAT image.
+font_dest=/work/iso-root/boot/grub2/fonts/unicode.pf2
+install -d "$(dirname "$font_dest")"
+for source_font in \
   /rootfs/usr/share/grub/unicode.pf2 \
+  /rootfs/usr/share/grub2/unicode.pf2 \
   /rootfs/boot/grub2/fonts/unicode.pf2 \
-  /usr/share/grub/unicode.pf2; do
-  if [[ -s "$source" ]]; then
-    install -Dm0644 "$source" /work/iso-root/boot/grub2/fonts/unicode.pf2
+  /usr/share/grub/unicode.pf2 \
+  /usr/share/grub2/unicode.pf2; do
+  if [[ -s "$source_font" ]]; then
+    install -m 0644 "$source_font" "$font_dest"
     break
   fi
 done
+if [[ ! -s "$font_dest" ]]; then
+  font_ttf=$(find /usr/share/fonts -type f \
+    \( -name DejaVuSans.ttf -o -name NotoSans-Regular.ttf \) \
+    -print -quit)
+  [[ -n "$font_ttf" ]] || {
+    echo 'No GRUB PF2 font or TTF fallback available' >&2
+    exit 1
+  }
+  grub2-mkfont -s 18 -o "$font_dest" "$font_ttf"
+fi
+[[ -s "$font_dest" ]] || { echo 'GRUB font is missing' >&2; exit 1; }
+install -Dm0644 "$font_dest" /work/EFI/BOOT/fonts/unicode.pf2
 
 grub_cfg="$(cat <<EOF
-set timeout=$(yq '.grub2.timeout // 10' < "$config")
+# Select the ISO filesystem FIRST. The original configuration attempted to
+# load a font while GRUB was still rooted at the EFI system partition.
+search --no-floppy --set=root -l '$iso_label'
 set default=$(yq '.grub2.default // 0' < "$config")
 set menu_auto_hide=false
+
+# Prefer the font embedded in a signed GRUB image (Secure Boot), otherwise
+# load our validated font from the Live ISO. Never rely on a missing font.
+if loadfont unicode; then
+  set astra_font_loaded=1
+else
+  if loadfont /boot/grub2/fonts/unicode.pf2; then
+    set astra_font_loaded=1
+  fi
+fi
+
 insmod all_video
 insmod gfxterm
 insmod gfxterm_background
 insmod png
 set gfxmode=auto
-if [ -f /boot/grub2/fonts/unicode.pf2 ]; then
-  loadfont /boot/grub2/fonts/unicode.pf2
-fi
 terminal_output gfxterm
 set gfxpayload=keep
 insmod gzio
 insmod part_gpt
 insmod chain
-search --no-floppy --set=root -l '$iso_label'
+set color_normal=white/black
+set color_highlight=black/light-cyan
+set menu_color_normal=white/black
+set menu_color_highlight=black/light-cyan
+
+# Explicitly draw the splash *before* the boot timeout. GRUB's default hidden
+# timeout can clear the graphical screen on some EFI firmwares; an interruptible
+# sleep keeps the picture displayed and switches to an indefinite menu on ESC.
 if background_image -m stretch /boot/grub2/astra-background.png; then
-  set color_normal=white/black
-  set color_highlight=black/light-cyan
-  set menu_color_normal=white/black
-  set menu_color_highlight=black/light-cyan
+  if insmod sleep; then
+    if sleep --interruptible 5; then
+      set timeout=0
+    else
+      set timeout=-1
+    fi
+  else
+    # A GRUB build lacking the sleep module still supports hidden timeouts.
+    set timeout_style=hidden
+    set timeout=5
+  fi
 else
-  echo 'Astra Retro OS: GRUB background unavailable; continuing with text menu.'
+  # Safe fallback: don't hide the menu if GRUB cannot render our background.
+  set timeout=5
 fi
 EOF
 )"
@@ -108,6 +165,9 @@ mcopy -v -i /work/uefi.img -s /work/EFI ::
 # Fail early if the expected files are not in the EFI FAT filesystem.
 mdir -i /work/uefi.img ::/EFI/BOOT/astra-background.png
 mdir -i /work/uefi.img ::/EFI/BOOT/grub.cfg
+mdir -i /work/uefi.img ::/EFI/BOOT/fonts/unicode.pf2
+mdir -i /work/uefi.img ::/EFI/BOOT/x86_64-efi/gfxterm_background.mod
+mdir -i /work/uefi.img ::/EFI/BOOT/x86_64-efi/png.mod
 
 a=$(test -s /work/iso-root/boot/grub2/astra-background.png && echo yes)
 [[ "$a" == yes ]]
