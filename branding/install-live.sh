@@ -45,6 +45,39 @@ if command -v desktop-file-validate >/dev/null 2>&1; then
 fi
 grep -qxF 'Icon=/usr/share/icons/hicolor/512x512/apps/astra-retro-os.png' /usr/share/applications/astra-retro-install.desktop
 
+# Brand the GNOME Live welcome screen.
+welcome="/usr/share/anaconda/gnome/fedora-welcome"
+logo="/usr/share/icons/hicolor/scalable/apps/astra-retro-os.svg"
+
+test -f "$welcome" || {
+  echo "ERROR: Fedora Welcome not found" >&2
+  exit 1
+}
+
+test -f "$logo" || {
+  echo "ERROR: Astra logo not found" >&2
+  exit 1
+}
+
+grep -q "iconName: 'fedora-logo-icon'" "$welcome" || {
+  echo "ERROR: Unexpected Fedora Welcome format" >&2
+  exit 1
+}
+
+sed -i \
+  "s/iconName: 'fedora-logo-icon'/iconName: 'astra-retro-os'/" \
+  "$welcome"
+
+# Also brand the Welcome desktop entry.
+desktop="/usr/share/anaconda/gnome/org.fedoraproject.welcome-screen.desktop"
+
+if [[ -f "$desktop" ]]; then
+  sed -i \
+    -e 's/^Icon=.*/Icon=astra-retro-os/' \
+    -e 's/^Name=.*/Name=Bienvenue dans Astra Retro OS/' \
+    "$desktop"
+fi
+
 # Preserve an existing dconf profile; make sure it includes our local database.
 if [[ ! -e /etc/dconf/profile/user ]]; then
   printf 'user-db:user\nsystem-db:local\n' > /etc/dconf/profile/user
