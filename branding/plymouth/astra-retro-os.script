@@ -4,6 +4,11 @@ background_image = Image("plymouth-splash.png");
 background_sprite = Sprite(background_image);
 background_sprite.SetZ(-100);
 
+# Separate transparent title, layered above the logo embedded in the backdrop.
+title_image = Image("astra-title.png");
+title_sprite = Sprite(title_image);
+title_sprite.SetZ(20);
+
 spinner_image = Image("spinner.png");
 spinner_frame_image = spinner_image;
 spinner_sprite = Sprite(spinner_frame_image);
@@ -16,6 +21,11 @@ fun refresh_callback () {
   # Recenter on display changes.
   background_sprite.SetX((Window.GetWidth() - background_image.GetWidth()) / 2);
   background_sprite.SetY((Window.GetHeight() - background_image.GetHeight()) / 2);
+
+  # Anchor the title to the backdrop (which already contains the Astra logo).
+  # At 1920x1080 it sits around y=270, safely above the centered logo.
+  title_sprite.SetX((Window.GetWidth() - title_image.GetWidth()) / 2);
+  title_sprite.SetY((Window.GetHeight() - background_image.GetHeight()) / 2 + background_image.GetHeight() * 0.25);
 
   # Refresh happens repeatedly; rotate one step every third callback.
   # This is an indeterminate indicator, not an estimate of boot progress.

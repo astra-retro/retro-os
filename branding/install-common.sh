@@ -26,6 +26,7 @@ script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 install -m 0644 "$script_dir/plymouth/astra-retro-os.plymouth" /usr/share/plymouth/themes/astra-retro-os/astra-retro-os.plymouth
 install -m 0644 "$script_dir/plymouth/astra-retro-os.script" /usr/share/plymouth/themes/astra-retro-os/astra-retro-os.script
 install -m 0644 "$script_dir/plymouth/spinner.png" /usr/share/plymouth/themes/astra-retro-os/spinner.png
+install -m 0644 "$script_dir/plymouth/astra-title.png" /usr/share/plymouth/themes/astra-retro-os/astra-title.png
 
 cat > /etc/dconf/db/local.d/20-astra-retro-os <<'DCONF'
 [org/gnome/desktop/background]
