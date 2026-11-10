@@ -205,7 +205,18 @@ mdir -i /work/uefi.img ::/EFI/BOOT/x86_64-efi/png.mod
 
 a=$(test -s /work/iso-root/boot/grub2/astra-background.png && echo yes)
 [[ "$a" == yes ]]
-grep -Fq 'background_image -m stretch /EFI/BOOT/astra-background.png' /work/iso-root/boot/grub2/grub.cfg
+# The generated GRUB config explicitly uses the boot-time GRUB $root variable.
+# Keep this assertion aligned with the actual command (not the old bare path).
+# Verify every GRUB config copy, including the one copied into the EFI FAT image.
+for cfg in \
+  /work/iso-root/boot/grub2/grub.cfg \
+  /work/EFI/BOOT/grub.cfg \
+  /work/iso-root/EFI/BOOT/grub.cfg; do
+  if ! grep -Fq 'background_image -m stretch ($root)/EFI/BOOT/astra-background.png' "$cfg"; then
+    echo "ERROR: $cfg does not reference the expected GRUB background path" >&2
+    exit 1
+  fi
+done
 
 xorriso -as mkisofs \
   -R \
