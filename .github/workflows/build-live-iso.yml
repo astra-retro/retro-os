@@ -8,21 +8,35 @@ on:
         required: true
         default: latest
         type: string
+  workflow_call:
+    inputs:
+      image_ref:
+        description: "Immutable GHCR OCI digest for the PR"
+        required: true
+        type: string
+      source_sha:
+        description: "Exact PR commit for installer and branding"
+        required: true
+        type: string
 
 permissions:
   contents: read
   packages: read
 
 concurrency:
-  group: live-iso-${{ github.ref }}
-  cancel-in-progress: true
+  group: live-iso-${{ github.run_id }}
+  cancel-in-progress: false
 
 jobs:
   live-iso:
     runs-on: ubuntu-26.04
+    if: github.ref == 'refs/heads/main'
     steps:
-      - name: Checkout
+      - name: Checkout exact source
         uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.source_sha || github.sha }}
+          persist-credentials: false
 
       - name: Free build space
         uses: ublue-os/remove-unwanted-software@695eb75bc387dbcd9685a8e72d23439d8686cba6
@@ -44,14 +58,24 @@ jobs:
       - name: Resolve exact RetroOS payload
         shell: bash
         env:
-          IMAGE_TAG: ${{ inputs.image_tag }}
+          IMAGE_REF: ${{ inputs.image_ref || '' }}
+          IMAGE_TAG: ${{ inputs.image_tag || 'latest' }}
         run: |
           set -euo pipefail
-          image="ghcr.io/${GITHUB_REPOSITORY,,}:${IMAGE_TAG}"
-          sudo podman pull "$image"
-          digest="$(sudo podman image inspect "$image" --format '{{.Digest}}')"
-          test -n "$digest" && test "$digest" != '<none>'
-          echo "RETRO_PAYLOAD=ghcr.io/${GITHUB_REPOSITORY,,}@${digest}" >> "$GITHUB_ENV"
+          if [[ -n "$IMAGE_REF" ]]; then
+            case "$IMAGE_REF" in
+              "ghcr.io/${GITHUB_REPOSITORY,,}"@sha256:*) ;;
+              *) echo "::error::Unexpected OCI image reference"; exit 1 ;;
+            esac
+            payload="$IMAGE_REF"
+          else
+            image="ghcr.io/${GITHUB_REPOSITORY,,}:${IMAGE_TAG}"
+            sudo podman pull "$image"
+            payload="$(sudo podman image inspect "$image" --format '{{index .RepoDigests 0}}')"
+          fi
+          [[ "$payload" == *@sha256:* ]] || { echo "::error::No OCI digest"; exit 1; }
+          sudo podman pull "$payload"
+          echo "RETRO_PAYLOAD=$payload" >> "$GITHUB_ENV"
 
       - name: Prepare Live ISO image
         shell: bash
