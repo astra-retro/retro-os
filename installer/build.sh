@@ -19,6 +19,19 @@ dnf5 -y install glibc-langpack-fr langpacks-fr
 bash /usr/share/retro-os/branding/install-common.sh /usr/share/retro-os/branding/assets live
 bash /usr/share/retro-os/branding/install-live.sh /usr/share/retro-os/branding/live
 
+# Brand the Fedora Live welcome screen.
+welcome=/usr/share/anaconda/gnome/fedora-welcome
+
+if [[ -f "$welcome" ]]; then
+    sed -i \
+        "s/iconName: 'fedora-logo-icon'/iconName: 'astra-retro-os'/" \
+        "$welcome"
+    sed -i \
+        -e 's/Welcome to Fedora!/Bienvenue dans Astra Retro OS !/g' \
+        -e 's/Install Fedora…/Installer Astra Retro OS…/g' \
+        "$welcome"
+fi
+
 # French defaults for the Live ISO only. The installed bootc OCI payload is untouched.
 # Write files directly: systemd-localed is not running during the container build.
 install -d /etc/X11/xorg.conf.d /etc/dconf/db/local.d
