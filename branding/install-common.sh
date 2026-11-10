@@ -131,4 +131,12 @@ done
 
 command -v plymouth-set-default-theme >/dev/null || { echo 'plymouth required' >&2; exit 1; }
 plymouth-set-default-theme astra-retro-os
+if [[ "$mode" == installed ]]; then
+  # The image is installed through Anaconda/bootc; persistent /boot cannot be
+  # modified while constructing the OCI container. Ship a first-boot sync.
+  install -D -m 0755 "$script_dir/sync-installed-boot.sh" /usr/libexec/astra-retro-os/sync-installed-boot
+  install -D -m 0644 "$script_dir/systemd/astra-installed-boot.service" /usr/lib/systemd/system/astra-installed-boot.service
+  install -D -m 0644 "$script_dir/systemd/astra-installed-boot.path" /usr/lib/systemd/system/astra-installed-boot.path
+  systemctl enable astra-installed-boot.service astra-installed-boot.path
+fi
 printf 'Astra branding installed (%s)\n' "$mode"
