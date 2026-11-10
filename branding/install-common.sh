@@ -51,6 +51,57 @@ fi
 command -v dconf >/dev/null || { echo 'dconf required' >&2; exit 1; }
 dconf update
 
+# The Background Logo extension changed its GSettings schema in Fedora 45.
+# Detect the installed version; do not write only to the obsolete fedorahosted path.
+# Install both dconf defaults and a GLib schema override, because Live sessions
+# can use a different dconf profile and would otherwise keep Fedora's defaults.
+if command -v gsettings >/dev/null && command -v glib-compile-schemas >/dev/null; then
+  available_schemas="$(gsettings list-schemas)"
+  background_logo_schema=''
+  for candidate in \
+    org.gnome.shell.extensions.background-logo \
+    org.fedorahosted.background-logo-extension; do
+    if grep -Fxq "$candidate" <<< "$available_schemas"; then
+      background_logo_schema="$candidate"
+      break
+    fi
+  done
+
+  if [[ -n "$background_logo_schema" ]]; then
+    logo_keys="$(gsettings list-keys "$background_logo_schema")"
+    if ! grep -Fxq 'logo-file' <<< "$logo_keys"; then
+      echo "ERROR: Unexpected Background Logo schema keys ($background_logo_schema):" >&2
+      printf '%s\n' "$logo_keys" >&2
+      exit 1
+    fi
+
+    logo_file='/usr/share/icons/hicolor/scalable/apps/astra-retro-os.svg'
+    schema_path="${background_logo_schema//./\/}"
+    override='/usr/share/glib-2.0/schemas/95-astra-background-logo.gschema.override'
+    dconf_file='/etc/dconf/db/local.d/25-astra-background-logo'
+    install -d "$(dirname "$override")" "$(dirname "$dconf_file")"
+    printf '[%s]\nlogo-file=\x27%s\x27\n' "$background_logo_schema" "$logo_file" > "$override"
+    printf '[%s]\nlogo-file=\x27%s\x27\n' "$schema_path" "$logo_file" > "$dconf_file"
+
+    if grep -Fxq 'logo-file-dark' <<< "$logo_keys"; then
+      printf 'logo-file-dark=\x27%s\x27\n' "$logo_file" >> "$override"
+      printf 'logo-file-dark=\x27%s\x27\n' "$logo_file" >> "$dconf_file"
+    fi
+    if grep -Fxq 'logo-always-visible' <<< "$logo_keys"; then
+      printf 'logo-always-visible=true\n' >> "$override"
+      printf 'logo-always-visible=true\n' >> "$dconf_file"
+    fi
+
+    glib-compile-schemas --strict /usr/share/glib-2.0/schemas
+    dconf update
+    echo "Configured Astra desktop overlay for $background_logo_schema"
+  else
+    echo 'Note: GNOME Background Logo extension not installed; no overlay branding needed.'
+  fi
+else
+  echo 'Note: GSettings tools unavailable; skipping background-logo schema defaults.'
+fi
+
 # Preserve ID=fedora, ID_LIKE, VERSION_ID and OSTREE metadata for compatibility.
 release=/usr/lib/os-release
 if [[ -f "$release" ]]; then
