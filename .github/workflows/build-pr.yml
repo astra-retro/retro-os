@@ -113,7 +113,7 @@ jobs:
       # Publish happens in a separate job: PR-controlled code never gets
       # a package-write token, GHCR credentials, or signing secrets.
       - name: Transfer OCI archive to publisher
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: retro-os-oci-${{ github.run_id }}
           path: dist/retro-os.oci.tar
@@ -132,7 +132,7 @@ jobs:
       image_ref: ${{ steps.push.outputs.image_ref }}
     steps:
       - name: Download OCI built without write credentials
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: retro-os-oci-${{ github.run_id }}
 
