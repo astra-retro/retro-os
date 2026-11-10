@@ -88,6 +88,12 @@ grub_cfg="$(cat <<EOF
 # Select the ISO filesystem FIRST. The original configuration attempted to
 # load a font while GRUB was still rooted at the EFI system partition.
 search --no-floppy --set=root -l '$iso_label'
+
+# The Fedora EFI binary may leave prefix at (hd0,gpt2)/EFI/fedora, whereas
+# Titanoboa copies GRUB modules to the Live ISO's /boot/grub2 directory.
+# Escape \$root here: this is an expanding Bash heredoc, and the variable
+# must be resolved by GRUB at boot time, not by the ISO build shell.
+set prefix=(\$root)/boot/grub2
 set default=$(yq '.grub2.default // 0' < "$config")
 set menu_auto_hide=false
 
@@ -105,7 +111,10 @@ insmod all_video
 insmod gfxterm
 insmod gfxterm_background
 insmod png
-set gfxmode=auto
+# The Astra artwork is 1920x1080 (16:9). Prefer 16:9 EFI framebuffer modes;
+# background_image -m stretch would otherwise distort it in a 4:3 auto mode.
+# Firmware without a supported 16:9 mode still falls back to auto.
+set gfxmode=1920x1080,1600x900,1366x768,1280x720,auto
 terminal_output gfxterm
 set gfxpayload=keep
 insmod gzio
@@ -121,7 +130,7 @@ set menu_color_highlight=black/light-cyan
 # sleep keeps the picture displayed and switches to an indefinite menu on ESC.
 # Both the ISO and the EFI FAT partition contain this exact path. The
 # older /boot/grub2 path existed ONLY on the ISO, not on the EFI partition.
-if background_image -m stretch /EFI/BOOT/astra-background.png; then
+if background_image -m stretch (\$root)/EFI/BOOT/astra-background.png; then
   if insmod sleep; then
     if sleep --interruptible 5; then
       set timeout=0
