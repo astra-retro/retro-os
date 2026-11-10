@@ -26,22 +26,24 @@ test -x /usr/bin/liveinst || {
 
 install -d /usr/share/applications /etc/dconf/db/local.d /etc/dconf/profile
 
-# Fedora anaconda-live installs liveinst.desktop. GNOME associates Anaconda's
-# window with this application ID; a separate astra-retro-install.desktop can
-# be displayed with a stale/Fedora icon when the installer is running.
-# Keep branding/live/astra-retro-install.desktop as the source of truth, but
-# install it using the canonical desktop ID.
-install -m 0644 "$src/astra-retro-install.desktop" /usr/share/applications/liveinst.desktop
+# Keep the Astra launcher ID which was already working as a GNOME dock
+# favorite. Only brand the stock Anaconda entry (used for window matching).
+install -m 0644 "$src/astra-retro-install.desktop" /usr/share/applications/astra-retro-install.desktop
 install -m 0644 "$src/astra-retro-terminal.desktop" /usr/share/applications/astra-retro-terminal.desktop
+rm -f /usr/share/applications/retro-os-install.desktop
 
-# Remove launchers created by earlier versions of installer/build.sh.
-rm -f /usr/share/applications/astra-retro-install.desktop /usr/share/applications/retro-os-install.desktop
-
-# Fail the OCI build if a subsequent change breaks the desktop entry.
-if command -v desktop-file-validate >/dev/null 2>&1; then
-  desktop-file-validate /usr/share/applications/liveinst.desktop
+if [[ -f /usr/share/applications/liveinst.desktop ]]; then
+  sed -i -e '/^NoDisplay=/d' -e '/^Icon=/d' \
+    /usr/share/applications/liveinst.desktop
+  printf '\nIcon=/usr/share/icons/hicolor/512x512/apps/astra-retro-os.png\nNoDisplay=true\n' \
+    >> /usr/share/applications/liveinst.desktop
 fi
-grep -qxF 'Icon=/usr/share/icons/hicolor/512x512/apps/astra-retro-os.png' /usr/share/applications/liveinst.desktop
+
+# Check the actual launcher pinned to the GNOME dock.
+if command -v desktop-file-validate >/dev/null 2>&1; then
+  desktop-file-validate /usr/share/applications/astra-retro-install.desktop
+fi
+grep -qxF 'Icon=/usr/share/icons/hicolor/512x512/apps/astra-retro-os.png' /usr/share/applications/astra-retro-install.desktop
 
 # Preserve an existing dconf profile; make sure it includes our local database.
 if [[ ! -e /etc/dconf/profile/user ]]; then
@@ -54,7 +56,7 @@ cat > /etc/dconf/db/local.d/30-astra-live <<'DCONF'
 [org/gnome/shell]
 # Enable the fixed dock; keep Fedora's existing background-logo extension.
 enabled-extensions=['dash-to-dock@micxgx.gmail.com', 'background-logo@fedorahosted.org']
-favorite-apps=['liveinst.desktop', 'astra-retro-terminal.desktop', 'org.gnome.Nautilus.desktop']
+favorite-apps=['astra-retro-install.desktop', 'astra-retro-terminal.desktop', 'org.gnome.Nautilus.desktop']
 
 [org/gnome/shell/extensions/dash-to-dock]
 dock-position='BOTTOM'
