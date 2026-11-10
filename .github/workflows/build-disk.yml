@@ -20,8 +20,8 @@ concurrency:
 jobs:
   qcow2:
     name: Build QCOW2 (amd64)
-    runs-on: ubuntu-26.04
-    timeout-minutes: 120
+    runs-on: ubuntu-24.04
+    timeout-minutes: 150
 
     steps:
       - name: Checkout
@@ -61,6 +61,10 @@ jobs:
           echo "ref=$digest" >> "$GITHUB_OUTPUT"
           echo "Building QCOW2 from $digest"
 
+      - name: Preflight osbuild mounts
+        shell: bash
+        run: bash .github/scripts/qcow2-mount-preflight.sh
+
       - name: Build QCOW2
         shell: bash
         env:
@@ -68,21 +72,46 @@ jobs:
         run: |
           set -euo pipefail
 
-          mkdir -p output
+          mkdir -p output diagnostics
 
+          # Run rootful with an unconfined AppArmor profile and no UID mapping.
+          set +e
           sudo podman run --rm \
             --privileged \
+            --userns=host \
             --security-opt apparmor=unconfined \
             --security-opt label=disable \
-            --userns=host \
             -v "$PWD/output:/output" \
             -v /var/lib/containers/storage:/var/lib/containers/storage \
             ghcr.io/osbuild/image-builder-cli:latest \
             --bootc-ref "$BOOTC_REF" \
             --bootc-default-fs btrfs \
-            build qcow2
-
+            build qcow2 2>&1 | tee diagnostics/qcow2-build.log
+          status=${PIPESTATUS[0]}
+          set -e
           sudo chown -R "$(id -u):$(id -g)" output
+          exit "$status"
+
+      - name: Mount diagnostics
+        if: failure()
+        shell: bash
+        run: |
+          echo '=== Mounted filesystems ==='
+          findmnt -T /var/lib/containers/storage || true
+          echo '=== AppArmor denials ==='
+          sudo journalctl -k --no-pager -n 200 \
+            | grep -Ei 'apparmor|DENIED|audit' || true
+          echo '=== Podman info ==='
+          sudo podman info --format '{{.Host.Security}}' || true
+
+      - name: Upload QCOW2 diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: retro-os-qcow2-diagnostics-${{ github.run_number }}
+          path: diagnostics/
+          if-no-files-found: ignore
+          retention-days: 7
 
       - name: Create SHA256 checksums
         shell: bash
