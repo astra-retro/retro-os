@@ -1,45 +1,52 @@
 /* Astra Retro OS: installer-only branding, PatternFly 6 and 5 fallback. */
 .anaconda {
-    --brand-default-light: #D8B4FE;
-    --brand-default: #9454C4;
-    --brand-default-dark: #7835A6;
-    --pf-t--global--color--brand--default: #9454C4;
-    --pf-t--global--color--brand--hover: #7835A6;
-    --pf-global--primary-color--100: #9454C4;
-    --pf-global--primary-color--200: #7835A6;
+  --brand-default-light: #d8b4fe;
+  --brand-default: #9454c4;
+  --brand-default-dark: #7835a6;
+  --pf-t--global--color--brand--default: #9454c4;
+  --pf-t--global--color--brand--hover: #7835a6;
+  --pf-global--primary-color--100: #9454c4;
+  --pf-global--primary-color--200: #7835a6;
 }
 
 /* Replace the Fedora mark in the top-left header with the existing Astra PNG. */
 .anaconda .logo {
-    background-image: url('astra-anaconda-logo.png') !important;
-    background-position: left center;
-    background-size: contain;
-    background-repeat: no-repeat;
+  background-image: url("astra-anaconda-logo.png") !important;
+  background-size: contain !important;
+  background-position: center !important;
+  background-repeat: no-repeat !important;
+
+  opacity: 1 !important;
+  filter: none !important;
+  mix-blend-mode: normal !important;
+  mask-image: none !important;
 }
 
 /* Header: pastel lilac with dark text, keeping the buttons readable. */
 .anaconda .pf-v6-c-page__header,
 .anaconda .pf-v5-c-page__header {
-    background-color: #DEBDF2;
-    color: #441C60;
+  background-color: #debdf2;
+  color: #441c60;
 }
 
 /* Purple primary actions; rose focus and hover accents. */
-.anaconda .pf-v6-c-button.pf-m-primary:not(:disabled):not([aria-disabled='true']),
-.anaconda .pf-v5-c-button.pf-m-primary:not(:disabled):not([aria-disabled='true']) {
-    background-color: #9454C4;
-    color: #FFFFFF;
+.anaconda
+  .pf-v6-c-button.pf-m-primary:not(:disabled):not([aria-disabled="true"]),
+.anaconda
+  .pf-v5-c-button.pf-m-primary:not(:disabled):not([aria-disabled="true"]) {
+  background-color: #9454c4;
+  color: #ffffff;
 }
 .anaconda .pf-v6-c-button.pf-m-primary:hover:not(:disabled),
 .anaconda .pf-v5-c-button.pf-m-primary:hover:not(:disabled) {
-    background-color: #AD4C98;
+  background-color: #ad4c98;
 }
 .anaconda :focus-visible {
-    outline-color: #DB64B1;
+  outline-color: #db64b1;
 }
 
 /* PatternFly 6 uses different token values in the dark theme. */
 .pf-v6-theme-dark .anaconda {
-    --pf-t--global--color--brand--default: #D8B4FE;
-    --pf-t--global--color--brand--hover: #9454C4;
+  --pf-t--global--color--brand--default: #d8b4fe;
+  --pf-t--global--color--brand--hover: #9454c4;
 }
