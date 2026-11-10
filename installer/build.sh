@@ -112,6 +112,17 @@ command -v ksvalidator >/dev/null || {
 }
 ksvalidator -v F45 /usr/share/anaconda/interactive-defaults.ks
 
+# Configure installed GRUB in Anaconda's post-install phase, if the target
+# boot partition and bootc payload have already been assembled. If Anaconda
+# mounts them later, the enabled first-boot service performs the same work.
+cat >> /usr/share/anaconda/interactive-defaults.ks <<'ASTRA_POST'
+%post --nochroot --log=/tmp/astra-installed-boot.log
+if [ -x /mnt/sysroot/usr/libexec/astra-retro-os/sync-installed-boot ]; then
+  ASTRA_ROOT=/mnt/sysroot /bin/bash /mnt/sysroot/usr/libexec/astra-retro-os/sync-installed-boot || true
+fi
+%end
+ASTRA_POST
+
 # Live session login, desktop, and initramfs.
 if [[ -e /etc/sysconfig/livesys ]]; then
     sed -i 's/^livesys_session=.*/livesys_session=gnome/' /etc/sysconfig/livesys

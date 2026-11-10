@@ -1,0 +1,10 @@
+[Unit]
+Description=Resynchronize Astra Retro OS debug entry after bootc deployments change
+ConditionPathExists=/boot/grub2/grub.cfg
+
+[Path]
+PathChanged=/boot/loader/entries
+Unit=astra-installed-boot.service
+
+[Install]
+WantedBy=multi-user.target

@@ -77,6 +77,10 @@ jobs:
         run: bash .github/scripts/test-bootc-tracking.sh
 
       # This actually builds the container image
+      - name: Validate installed boot branding script
+        shell: bash
+        run: bash branding/tests/test-installed-boot.sh
+
       - name: Build Image
         id: build-image
         run: |
