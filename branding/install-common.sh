@@ -67,9 +67,14 @@ fi
 # Fedora's light and dark assets are provided by the fedora-logos package.
 # Install our common Astra logo at those expected paths in both OCI images.
 # Run this after package installation so the Fedora RPM does not restore them.
+# GNOME Settings renders these distributor pixmaps at a large size. Use a
+# dedicated 256x256 image with a centered 128px logo; keep the full-size
+# Astra icon for GNOME Shell, Plymouth and other applications.
+about_logo="$assets/gnome-about-logo.png"
+test -s "$about_logo" || { echo "Missing About logo: $about_logo" >&2; exit 1; }
 install -d /usr/share/pixmaps
 for settings_logo in fedora_logo_med.png fedora_whitelogo_med.png; do
-  install -m 0644 "$assets/astra-retro-os-logo.png" "/usr/share/pixmaps/$settings_logo"
+  install -m 0644 "$about_logo" "/usr/share/pixmaps/$settings_logo"
 done
 
 command -v plymouth-set-default-theme >/dev/null || { echo 'plymouth required' >&2; exit 1; }
