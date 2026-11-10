@@ -8,7 +8,7 @@
 # boot image, so GRUB can access the background before the Linux LiveOS mounts.
 set -euo pipefail
 
-dnf5 install -qy squashfs-tools xorriso yq mtools dosfstools \
+dnf5 install -qy squashfs-tools xorriso yq mtools dosfstools util-linux \
   grub2-efi-x64-modules grub2-tools-extra dejavu-sans-fonts
 
 mkdir -p /work/iso-root/boot/grub2 /work/iso-root/images/pxeboot /work/iso-root/LiveOS
@@ -159,9 +159,29 @@ for dir in /work/EFI/* /work/iso-root/boot/grub2; do
 done
 cp -avT /work/EFI /work/iso-root/EFI
 
+# Stage the exact path used by grub.cfg explicitly in the ISO9660 tree,
+# independently of the EFI-directory tree copy above.
+install -Dm0644 "$background" /work/iso-root/EFI/BOOT/astra-background.png
+cmp "$background" /work/iso-root/EFI/BOOT/astra-background.png
+
 truncate -s 100M /work/uefi.img
 mkfs.fat -F32 /work/uefi.img
 mcopy -v -i /work/uefi.img -s /work/EFI ::
+
+# Explicitly update the image at GRUB's expected path INSIDE the FAT EFI
+# filesystem, not only in the ISO9660 tree. mcopy -o avoids an interactive
+# overwrite prompt if the recursive EFI copy already created that file.
+mcopy -o -i /work/uefi.img "$background" ::/EFI/BOOT/astra-background.png
+
+# Verify the actual FAT file contents rather than merely checking its name.
+fat_verify_dir=$(mktemp -d)
+mcopy -i /work/uefi.img ::/EFI/BOOT/astra-background.png \
+  "$fat_verify_dir/astra-background.png"
+if ! cmp -s "$background" "$fat_verify_dir/astra-background.png"; then
+  echo 'ERROR: EFI FAT image contains an incorrect GRUB background' >&2
+  exit 1
+fi
+rm -rf "$fat_verify_dir"
 
 # Fail early if the expected files are not in the EFI FAT filesystem.
 mdir -i /work/uefi.img ::/EFI/BOOT/astra-background.png
@@ -190,3 +210,61 @@ xorriso -as mkisofs \
   -iso-level 3 \
   -o "/output/${iso_label}.iso" \
   iso-root
+
+# Validate the *final ISO artifact*. Staging checks alone cannot detect a
+# missing file if a different tree or a later repacking step produced the ISO.
+iso_output="/output/${iso_label}.iso"
+verify_dir=$(mktemp -d)
+trap 'rm -rf "$verify_dir"' EXIT
+if ! xorriso -osirrox on -indev "$iso_output" \
+    -extract /EFI/BOOT/astra-background.png "$verify_dir/astra-background.png"; then
+  echo "ERROR: $iso_output does not contain /EFI/BOOT/astra-background.png" >&2
+  exit 1
+fi
+if ! cmp -s "$background" "$verify_dir/astra-background.png"; then
+  echo 'ERROR: Final ISO GRUB background differs from branding source' >&2
+  exit 1
+fi
+echo 'OK: GRUB background found and verified inside the final ISO9660 filesystem.'
+
+# The ISO9660 files are NOT the EFI System Partition. xorriso appended the
+# prepared FAT filesystem as partition 2. Extract THAT partition from the
+# distributable ISO and compare the wallpaper inside it against the source.
+# partx reads the partition table without loop devices or privileged mounts.
+command -v partx >/dev/null || {
+  echo 'ERROR: partx (util-linux) is needed to verify the final EFI partition' >&2
+  exit 1
+}
+if ! efi_range=$(partx --show --raw --noheadings --nr 2 \
+    --output START,SECTORS "$iso_output"); then
+  echo "ERROR: cannot locate EFI partition 2 in $iso_output" >&2
+  exit 1
+fi
+read -r efi_start efi_sectors <<< "$efi_range"
+if [[ ! "$efi_start" =~ ^[0-9]+$ || ! "$efi_sectors" =~ ^[0-9]+$ ]] \
+    || (( efi_sectors == 0 )); then
+  echo "ERROR: invalid EFI partition offsets: $efi_range" >&2
+  exit 1
+fi
+
+dd if="$iso_output" of="$verify_dir/final-efi.img" bs=512 \
+  skip="$efi_start" count="$efi_sectors" status=none
+if ! mdir -i "$verify_dir/final-efi.img" ::/EFI/BOOT/astra-background.png; then
+  echo 'ERROR: background missing from FINAL ISO EFI partition' >&2
+  exit 1
+fi
+if ! mcopy -i "$verify_dir/final-efi.img" \
+    ::/EFI/BOOT/astra-background.png \
+    "$verify_dir/astra-background-efi.png"; then
+  echo 'ERROR: cannot extract wallpaper from FINAL ISO EFI partition' >&2
+  exit 1
+fi
+if ! cmp -s "$background" "$verify_dir/astra-background-efi.png"; then
+  echo 'ERROR: background in FINAL ISO EFI partition differs from source' >&2
+  exit 1
+fi
+if ! mdir -i "$verify_dir/final-efi.img" ::/EFI/BOOT/grub.cfg; then
+  echo 'ERROR: grub.cfg missing from FINAL ISO EFI partition' >&2
+  exit 1
+fi
+echo 'OK: GRUB background and grub.cfg verified inside final EFI partition.'
