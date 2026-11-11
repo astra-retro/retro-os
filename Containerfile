@@ -56,7 +56,7 @@ RUN --mount=type=cache,dst=/var/cache \
       --mount=type=bind,from=branding_assets,source=/,target=/astra-branding \
       --mount=type=tmpfs,dst=/tmp \
       /ctx/image-info.sh \
-      && dnf5 -y install plymouth-plugin-script dconf grub2-efi-x64-modules gnome-shell-extension-dash-to-dock blueprint-compiler \
+      && dnf5 -y install plymouth-plugin-script dconf grub2-efi-x64-modules gnome-shell-extension-dash-to-dock blueprint-compiler openssh-server firewalld \
       && bash /astra-branding/install-common.sh /astra-branding/assets installed \
       && /ctx/build-initramfs.sh \
       && /ctx/finalize.sh \

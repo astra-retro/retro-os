@@ -86,6 +86,7 @@ jobs:
           bash branding/tests/test-firstboot-background.sh
           bash branding/tests/test-settings-donate.sh
           bash branding/tests/test-welcome-tour.sh
+          bash branding/tests/test-power-ssh.sh
           bash build_files/test-emulation-build-order.sh
 
       - name: Build Image

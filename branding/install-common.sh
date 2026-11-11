@@ -47,6 +47,12 @@ if [[ "$mode" == installed ]]; then
   install -m 0644 "$script_dir/desktop/26-astra-no-welcome-tour" \
     /etc/dconf/db/local.d/26-astra-no-welcome-tour
 
+  # Installed desktops are appliances: no automatic screen blanking or
+  # suspend, on AC or battery. These are unlocked dconf defaults and
+  # therefore do not override existing users' personal settings.
+  install -m 0644 "$script_dir/desktop/27-astra-always-on" \
+    /etc/dconf/db/local.d/27-astra-always-on
+
   # GNOME Initial Setup creates the user in a special GDM-owned session,
   # not the ordinary GNOME desktop session. GDM has a separate dconf profile.
   # Preserve a vendor/admin-provided profile and only attach the gdm database.
@@ -64,6 +70,27 @@ if [[ "$mode" == installed ]]; then
   fi
   install -m 0644 "$script_dir/desktop/20-astra-gdm-background" \
     /etc/dconf/db/gdm.d/20-astra-gdm-background
+  # GDM has a separate settings database. Keep the monitor active while
+  # waiting at the greeter, without interfering with password protection.
+  install -m 0644 "$script_dir/desktop/27-astra-always-on" \
+    /etc/dconf/db/gdm.d/27-astra-always-on
+
+  # Block system-managed automatic suspend (including lid switch) and the
+  # sleep targets. These restrictions can be changed by an administrator.
+  install -D -m 0644 "$script_dir/systemd/60-astra-no-suspend.conf" \
+    /usr/lib/systemd/logind.conf.d/60-astra-no-suspend.conf
+  systemctl mask sleep.target suspend.target hibernate.target \
+    hybrid-sleep.target suspend-then-hibernate.target
+
+  # Enable SSH on every newly installed Retro OS system. Login still
+  # requires an authorized user/key/password; no account is created here.
+  systemctl enable sshd.service
+  if command -v firewall-offline-cmd >/dev/null 2>&1; then
+    firewall-offline-cmd --add-service=ssh
+  else
+    echo 'ERROR: firewall-offline-cmd missing; cannot enable SSH in firewall' >&2
+    exit 1
+  fi
 fi
 
 cat > /etc/dconf/db/local.d/20-astra-retro-os <<'DCONF'
