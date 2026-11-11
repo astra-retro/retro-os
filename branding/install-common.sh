@@ -5,7 +5,7 @@ set -euo pipefail
 assets="${1:?Provide asset directory}"
 mode="${2:-installed}"
 case "$mode" in installed|live) ;; *) echo "Unknown mode: $mode" >&2; exit 2;; esac
-for f in wallpaper.png boot-background.png grub-background.png plymouth-splash.png astra-retro-os-logo.svg astra-retro-os-logo.png; do
+for f in wallpaper.png wallpaper-pixel-art.png boot-background.png grub-background.png plymouth-splash.png astra-retro-os-logo.svg astra-retro-os-logo.png; do
   test -s "$assets/$f" || { echo "Missing branding asset: $assets/$f" >&2; exit 1; }
 done
 
@@ -16,6 +16,10 @@ install -d /usr/share/backgrounds/astra-retro-os \
   /usr/share/astra-retro-os \
   /etc/dconf/db/local.d
 install -m 0644 "$assets/wallpaper.png" /usr/share/backgrounds/astra-retro-os/wallpaper.png
+install -m 0644 "$assets/wallpaper-pixel-art.png" /usr/share/backgrounds/astra-retro-os/wallpaper-pixel-art.png
+test -s /usr/share/backgrounds/astra-retro-os/wallpaper-pixel-art.png || {
+  echo 'ERROR: Pixel-art GDM wallpaper was not copied to the installed image' >&2; exit 1;
+}
 install -m 0644 "$assets/boot-background.png" /usr/share/astra-retro-os/boot-background.png
 install -m 0644 "$assets/grub-background.png" /usr/share/astra-retro-os/grub-background.png
 install -m 0644 "$assets/astra-retro-os-logo.svg" /usr/share/icons/hicolor/scalable/apps/astra-retro-os.svg
@@ -70,6 +74,8 @@ if [[ "$mode" == installed ]]; then
   fi
   install -m 0644 "$script_dir/desktop/20-astra-gdm-background" \
     /etc/dconf/db/gdm.d/20-astra-gdm-background
+  # GNOME Shell (not dconf) owns the pre-login greeter's background.
+  python3 "$script_dir/gdm/install-greeter-wallpaper.py"
   # GDM has a separate settings database. Keep the monitor active while
   # waiting at the greeter, without interfering with password protection.
   install -m 0644 "$script_dir/desktop/27-astra-always-on" \

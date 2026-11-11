@@ -2,12 +2,12 @@
 # the desktop user exists. This is separate from dconf's local user profile.
 # Keep both light/dark URIs aligned with the already installed desktop image.
 [org/gnome/desktop/background]
-picture-uri='file:///usr/share/backgrounds/astra-retro-os/wallpaper.png'
-picture-uri-dark='file:///usr/share/backgrounds/astra-retro-os/wallpaper.png'
+picture-uri='file:///usr/share/backgrounds/astra-retro-os/wallpaper-pixel-art.png'
+picture-uri-dark='file:///usr/share/backgrounds/astra-retro-os/wallpaper-pixel-art.png'
 picture-options='zoom'
 
 [org/gnome/desktop/screensaver]
-picture-uri='file:///usr/share/backgrounds/astra-retro-os/wallpaper.png'
+picture-uri='file:///usr/share/backgrounds/astra-retro-os/wallpaper-pixel-art.png'
 picture-options='zoom'
 
 # GNOME's login-screen.logo is a foreground greeter badge, NOT a

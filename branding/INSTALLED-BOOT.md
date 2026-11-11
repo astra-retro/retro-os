@@ -249,3 +249,30 @@ system defaults to apply.
 **Security:** an enabled SSH server listens for authenticated connections.
 If the machine is exposed to untrusted networks, configure key-only
 authentication and restrict access using firewalld.
+
+## GDM login greeter wallpaper (pixel art)
+
+The existing `branding/assets/wallpaper-pixel-art.png` is now required and
+copied into the installed OCI at
+`/usr/share/backgrounds/astra-retro-os/wallpaper-pixel-art.png` (0644).
+The normal desktop continues using its separate `wallpaper.png`.
+
+GNOME 49 draws the pre-login greeter from its compiled Shell theme resource.
+The installed build runs `branding/gdm/install-greeter-wallpaper.py`: it
+extracts **all original resource members**, appends a background image only
+to the `#lockDialogGroup` selector in dark/light/high-contrast CSS, rebuilds
+the resource, and checks its complete member set. An incompatible upstream
+resource makes the build fail instead of damaging login controls. The GDM
+dconf profile also refers to the pixel-art asset, with `logo=''` so the
+login dialog is never hidden by an oversized foreground logo.
+
+The change is applied inside the OCI build to immutable `/usr`, not by
+writing to `/usr` after installation. This unsupported GNOME theme
+customization needs a visual UEFI/GDM test before merging.
+
+After updating, check:
+```bash
+stat /usr/share/backgrounds/astra-retro-os/wallpaper-pixel-art.png
+gresource extract /usr/share/gnome-shell/gnome-shell-theme.gresource \
+  /org/gnome/shell/theme/gnome-shell-dark.css | grep -A8 'Astra Retro OS GDM'
+```
