@@ -28,6 +28,15 @@ install -m 0644 "$script_dir/plymouth/astra-retro-os.script" /usr/share/plymouth
 install -m 0644 "$script_dir/plymouth/spinner.png" /usr/share/plymouth/themes/astra-retro-os/spinner.png
 install -m 0644 "$script_dir/plymouth/astra-title.png" /usr/share/plymouth/themes/astra-retro-os/astra-title.png
 
+# The Live session already installs Dash to Dock. Require the same GNOME
+# extension in the installed OCI payload and apply the same shared defaults.
+dock_extension=/usr/share/gnome-shell/extensions/dash-to-dock@micxgx.gmail.com
+test -d "$dock_extension" || {
+  echo "ERROR: Dash to Dock not installed: $dock_extension" >&2
+  exit 1
+}
+install -m 0644 "$script_dir/desktop/25-astra-dock" /etc/dconf/db/local.d/25-astra-dock
+
 cat > /etc/dconf/db/local.d/20-astra-retro-os <<'DCONF'
 [org/gnome/desktop/background]
 picture-uri='file:///usr/share/backgrounds/astra-retro-os/wallpaper.png'
