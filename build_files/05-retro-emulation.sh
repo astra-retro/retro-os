@@ -1,6 +1,15 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+
+# Package the RetroOS helper scripts, units and launchers BEFORE the
+# emulation setup checks their presence. "overrides" is a separate tree.
+if [[ ! -d /tmp/system_files/retro-emulation/usr ]]; then
+    echo 'ERROR: system_files/retro-emulation/usr staging tree missing' >&2
+    exit 1
+fi
+cp --archive --verbose --force /tmp/system_files/retro-emulation/usr/. /usr/
+
 # Package all bootstrap tools in immutable /usr. Do not install Flatpaks
 # or EmuDeck in the build container: their state belongs in /var/home.
 for tool in retro-emulation-setup retro-fetch-esde retro-launch-esde retro-install-emudeck; do
