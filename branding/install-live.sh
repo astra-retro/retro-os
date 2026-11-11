@@ -89,20 +89,12 @@ elif ! grep -qxF 'system-db:local' /etc/dconf/profile/user; then
   printf '\nsystem-db:local\n' >> /etc/dconf/profile/user
 fi
 
+# Dash to Dock activation, visibility and position now come from
+# install-common.sh for BOTH Live and installed systems. Only the installer
+# launchers/favorites are Live-specific.
 cat > /etc/dconf/db/local.d/30-astra-live <<'DCONF'
 [org/gnome/shell]
-# Enable the fixed dock; keep Fedora's existing background-logo extension.
-enabled-extensions=['dash-to-dock@micxgx.gmail.com', 'background-logo@fedorahosted.org']
 favorite-apps=['astra-retro-install.desktop', 'astra-retro-terminal.desktop', 'org.gnome.Nautilus.desktop']
-
-[org/gnome/shell/extensions/dash-to-dock]
-dock-position='BOTTOM'
-dock-fixed=true
-autohide=false
-intellihide=false
-extend-height=false
-dash-max-icon-size=48
-show-show-apps-button=true
 DCONF
 
 dconf update

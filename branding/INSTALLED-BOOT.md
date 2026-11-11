@@ -76,3 +76,38 @@ rebuilding the Live ISO does not replace the already installed OS image.
 If `plymouth.enable=0` is present, a Debug entry was selected; choose the
 normal boot entry and try again. Serial consoles and firmware framebuffer
 behavior can also prevent the graphical splash on some machines.
+
+## Shared GNOME dock (Live and installed)
+
+- The same Fedora `gnome-shell-extension-dash-to-dock` RPM is installed
+  into the Live image and the installed OCI image.
+- `branding/desktop/25-astra-dock` is applied by `install-common.sh`
+  to both images. It enables Dash to Dock and the Fedora background-logo
+  extension; the dock is bottom-aligned, fixed, and neither automatically
+  nor intelligently hidden.
+- The Live-only `30-astra-live` dconf file contains only installer favorites,
+  not the shared dock settings. The installed GNOME desktop does **not**
+  receive the Anaconda installer launcher.
+- `dconf update` compiles these machine defaults. They do **not** lock keys
+  and so do not overwrite settings saved in an existing user's dconf database.
+
+To inspect the *logged-in desktop user* on an installed system:
+
+```bash
+gnome-extensions list | grep dash-to-dock
+gnome-extensions list --enabled | grep dash-to-dock
+gsettings get org.gnome.shell.extensions.dash-to-dock dock-fixed
+gsettings get org.gnome.shell.extensions.dash-to-dock autohide
+gsettings get org.gnome.shell.extensions.dash-to-dock intellihide
+```
+
+If the user previously stored different settings, after installing the updated
+OCI image run these commands **as the desktop user, not root**, then sign out
+and back in:
+
+```bash
+gnome-extensions enable dash-to-dock@micxgx.gmail.com
+gsettings set org.gnome.shell.extensions.dash-to-dock dock-fixed true
+gsettings set org.gnome.shell.extensions.dash-to-dock autohide false
+gsettings set org.gnome.shell.extensions.dash-to-dock intellihide false
+```

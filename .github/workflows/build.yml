@@ -82,6 +82,7 @@ jobs:
         run: |
           bash branding/tests/test-installed-boot.sh
           bash branding/tests/test-plymouth-boot.sh
+          bash branding/tests/test-dock.sh
 
       - name: Build Image
         id: build-image
