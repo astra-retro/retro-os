@@ -17,8 +17,10 @@ assert background['picture-uri'] == f"'{expected}'"
 assert background['picture-uri-dark'] == f"'{expected}'"
 assert background['picture-options'] == "'zoom'"
 assert screensaver['picture-uri'] == f"'{expected}'"
-assert config['org/gnome/login-screen']['logo'] == \
-       "'/usr/share/icons/hicolor/512x512/apps/astra-retro-os.png'"
+# The GDM logo is a foreground element; never put a full-size icon here.
+# The empty value also clears the problematic setting on upgraded systems.
+assert config['org/gnome/login-screen']['logo'] == "''"
+assert '512x512/apps/astra-retro-os.png' not in p.read_text()
 
 common = Path('branding/install-common.sh').read_text()
 assert 'gdm_profile=/etc/dconf/profile/gdm' in common
