@@ -138,5 +138,15 @@ if [[ "$mode" == installed ]]; then
   install -D -m 0644 "$script_dir/systemd/astra-installed-boot.service" /usr/lib/systemd/system/astra-installed-boot.service
   install -D -m 0644 "$script_dir/systemd/astra-installed-boot.path" /usr/lib/systemd/system/astra-installed-boot.path
   systemctl enable astra-installed-boot.service astra-installed-boot.path
+
+  # Anaconda/bootc imports these normal-boot kernel arguments when installing
+  # and keeps them updated with subsequent deployments; leave debug BLS verbose.
+  install -D -m 0644 "$script_dir/kargs/10-astra-graphical-boot.toml" \
+    /usr/lib/bootc/kargs.d/10-astra-graphical-boot.toml
+
+  # The installed initramfs is generic (--no-hostonly): some Dracut releases
+  # otherwise select only the fallback text theme, so bundle our script theme.
+  install -D -m 0644 "$script_dir/dracut/51astra-plymouth/module-setup.sh" \
+    /usr/lib/dracut/modules.d/51astra-plymouth/module-setup.sh
 fi
 printf 'Astra branding installed (%s)\n' "$mode"

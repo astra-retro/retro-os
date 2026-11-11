@@ -79,7 +79,9 @@ jobs:
       # This actually builds the container image
       - name: Validate installed boot branding script
         shell: bash
-        run: bash branding/tests/test-installed-boot.sh
+        run: |
+          bash branding/tests/test-installed-boot.sh
+          bash branding/tests/test-plymouth-boot.sh
 
       - name: Build Image
         id: build-image

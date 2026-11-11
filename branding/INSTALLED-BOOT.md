@@ -2,8 +2,10 @@
 
 The OCI image already uses `branding/install-common.sh` for **both** Live
 and installed payloads. Wallpaper, GNOME logo, os-release and Plymouth are
-shared; `build_files/build-initramfs.sh` includes Plymouth in the installed
-initramfs. Only the GRUB disk contents need syncing after installation.
+shared. The installed initramfs is generated in generic mode and must bundle
+the Astra script theme explicitly. The normal boot also needs `quiet rhgb`
+to show the Plymouth splash instead of routine kernel/service logs.
+The GRUB disk contents are synchronized separately.
 
 ## Installed GRUB
 
@@ -37,3 +39,35 @@ sudo cat /boot/loader/entries/0000-astra-retro-debug-0.conf
 The test covers first installation, idempotency, GRUB user customisations,
 updated BLS entries, and an unknown GRUB layout. A real UEFI/Secure Boot
 boot should still be validated in a VM before merging.
+
+## Installed Plymouth and kernel arguments
+
+- `branding/kargs/10-astra-graphical-boot.toml` adds `quiet rhgb` via
+  `/usr/lib/bootc/kargs.d/`, which bootc applies on installation and image
+  upgrades. It avoids unmanaged changes to GRUB or BLS files.
+- `branding/dracut/51astra-plymouth/module-setup.sh` explicitly embeds the
+  scripted splash, artwork, default theme symlink, and renderer plugin in the
+  generic Dracut initramfs while retaining `--no-hostonly` for portability.
+- `build_files/build-initramfs.sh` validates the themed initramfs during the
+  OCI build; missing assets or script.so now fail the build instead of
+  silently showing console logs.
+- The generated BLS Debug entry intentionally removes `quiet rhgb` and
+  disables Plymouth so that diagnostics remain visible.
+
+To check a booted installed machine:
+
+```bash
+cat /proc/cmdline
+plymouth-set-default-theme
+sudo lsinitrd /usr/lib/modules/$(uname -r)/initramfs.img | grep -E 'astra-retro-os|plymouth/script.so'
+sudo journalctl -b -u plymouth-start.service -u plymouth-quit.service --no-pager
+sudo grubby --info=ALL | grep -E '^(index|title|args)='
+```
+
+If `/proc/cmdline` lacks `quiet rhgb`, check the booted OSTree deployment
+(`bootc status`). A new OCI build/deployment is required: merely
+rebuilding the Live ISO does not replace the already installed OS image.
+
+If `plymouth.enable=0` is present, a Debug entry was selected; choose the
+normal boot entry and try again. Serial consoles and firmware framebuffer
+behavior can also prevent the graphical splash on some machines.

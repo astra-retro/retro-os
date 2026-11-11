@@ -1,0 +1,3 @@
+# Astra Retro OS normal boot: show Plymouth and suppress routine status logs.
+# Managed by bootc for new installs and for existing installations on upgrade.
+kargs = ["quiet", "rhgb"]
