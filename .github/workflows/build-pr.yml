@@ -9,7 +9,7 @@ on:
         required: true
         type: number
       format:
-        description: "Images to build"
+        description: "Build OCI and optionally ISO / QCOW2"
         required: true
         type: choice
         default: both
@@ -17,6 +17,7 @@ on:
           - both
           - iso
           - qcow2
+          - oci
 
 permissions:
   contents: read
