@@ -1,0 +1,14 @@
+# Astra Retro OS installed-only: do not blank the monitor or suspend
+# when the session is idle. No dconf locks: users may change these values.
+[org/gnome/desktop/session]
+idle-delay=uint32 0
+
+[org/gnome/settings-daemon/plugins/power]
+sleep-inactive-ac-type='nothing'
+sleep-inactive-battery-type='nothing'
+sleep-inactive-ac-timeout=0
+sleep-inactive-battery-timeout=0
+
+# Prevent idle-triggered screensaver/blanking; manual Super+L remains possible.
+[org/gnome/desktop/screensaver]
+idle-activation-enabled=false

@@ -202,3 +202,50 @@ DCONF_PROFILE=gdm gsettings get org.gnome.login-screen logo
 
 Expected: `''`. If the greeter session already cached its prior dconf
 value, a full reboot ensures it is recreated.
+
+## Installed-only always-on display, no suspend and SSH
+
+Astra Retro OS installed images deliberately keep the screen active and
+prevent sleep. The Live ISO is unchanged.
+
+- `branding/desktop/27-astra-always-on` is installed into both the GNOME
+  user dconf database (`local`) and GDM's separate database (`gdm`).
+  GNOME's idle-delay is zero, automatic AC/battery sleep is disabled, and
+  idle screensaver activation is disabled. The user's manual lock remains
+  available. These settings are **defaults**, not forced locks; existing
+  users may have personal settings that take priority.
+- `branding/systemd/60-astra-no-suspend.conf` sets `IdleAction=ignore`
+  and disables lid-triggered sleep. The systemd sleep/suspend/hibernate
+  targets are masked in the installed image (including manual suspension).
+  This increases energy use, especially on laptops.
+- `openssh-server` and `firewalld` are installed in the OCI image,
+  `sshd.service` is enabled at boot, and the default firewalld zone
+  permits the SSH service (TCP port 22). No SSH password, account, or
+  authorized key is generated. **SSH access is exposed to networks allowed
+  by the firewall and requires valid authentication.** Hardening
+  (key-only authentication, remote network restriction) remains an
+  administrator responsibility.
+
+Validation after updating and rebooting:
+
+```bash
+gsettings get org.gnome.desktop.session idle-delay
+gsettings get org.gnome.settings-daemon.plugins.power sleep-inactive-ac-type
+gsettings get org.gnome.settings-daemon.plugins.power sleep-inactive-battery-type
+systemd-analyze cat-config systemd/logind.conf
+systemctl is-enabled sleep.target suspend.target hibernate.target
+systemctl is-enabled sshd.service
+systemctl is-active sshd.service
+sudo firewall-cmd --list-services
+ss -lnt | grep ':22 '
+```
+
+Expected: idle delay `uint32 0`, AC/battery sleep types `'nothing'`,
+suspend-related units `masked`, and `sshd.service` `enabled` and
+`active`. The firewall's active zone must allow SSH. Existing GNOME
+users may need to reset their personal power/idle settings for new
+system defaults to apply.
+
+**Security:** an enabled SSH server listens for authenticated connections.
+If the machine is exposed to untrusted networks, configure key-only
+authentication and restrict access using firewalld.
