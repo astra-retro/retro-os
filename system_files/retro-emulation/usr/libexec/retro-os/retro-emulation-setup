@@ -7,6 +7,10 @@ if [[ "$(id -u)" == 0 || -z "${HOME:-}" ]]; then
   exit 1
 fi
 
+# Apply vendor splash / progress settings even if emulator provisioning was
+# previously completed. The helper preserves existing personal overrides.
+/usr/libexec/retro-os/retro-configure-esde
+
 STATE="${XDG_STATE_HOME:-$HOME/.local/state}/retro-os"
 LOG="${STATE}/setup.log"
 MARK="${STATE}/emulators-v1.done"

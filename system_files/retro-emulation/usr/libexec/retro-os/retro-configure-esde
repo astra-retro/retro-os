@@ -1,0 +1,80 @@
+#!/usr/bin/env bash
+# Install Astra ES-DE branding for each user without overwriting custom assets.
+set -euo pipefail
+
+if [[ "$(id -u)" == 0 || -z "${HOME:-}" ]]; then
+  echo "retro-configure-esde requires a regular user with HOME" >&2
+  exit 1
+fi
+
+source_svg="${ASTRA_ESDE_SPLASH_SOURCE:-/usr/share/retro-os/esde/splash.svg}"
+appdata="${ESDE_APPDATA_DIR:-$HOME/ES-DE}"
+if [[ "$appdata" == "~/"* ]]; then
+  appdata="$HOME/${appdata:2}"
+fi
+splash_dir="$appdata/resources/graphics"
+settings_dir="$appdata/settings"
+mkdir -p "$splash_dir" "$settings_dir"
+exec 9>"$appdata/.astra-esde-config.lock"
+flock 9
+
+if [[ -s "$source_svg" ]]; then
+  target="$splash_dir/splash.svg"
+  marker="$splash_dir/.astra-retro-os-splash.sha256"
+  can_replace=0
+  if [[ ! -e "$target" ]]; then
+    can_replace=1
+  elif [[ -f "$marker" ]] && [[ "$(sha256sum "$target" | cut -d' ' -f1)" == "$(cat "$marker")" ]]; then
+    can_replace=1
+  fi
+  if (( can_replace )); then
+    if ! cmp -s "$source_svg" "$target"; then
+      tmp="$(mktemp "$splash_dir/.astra-splash.XXXXXX")"
+      trap 'rm -f "$tmp"' EXIT
+      install -m 0644 "$source_svg" "$tmp"
+      mv -f "$tmp" "$target"
+      trap - EXIT
+    fi
+    sha256sum "$target" | cut -d' ' -f1 > "$marker"
+  fi
+else
+  echo "Warning: missing Astra ES-DE splash asset: $source_svg" >&2
+fi
+
+# Only add the vendor default. Leave a previously personalized value alone.
+python3 - "$settings_dir/es_settings.xml" <<'PY_ESDE_SETTINGS'
+import os
+import sys
+import tempfile
+import xml.etree.ElementTree as ET
+
+path = sys.argv[1]
+if os.path.exists(path):
+    try:
+        tree = ET.parse(path)
+    except ET.ParseError as exc:
+        print(f"Warning: refusing to overwrite invalid ES-DE settings: {exc}", file=sys.stderr)
+        sys.exit(0)
+    root = tree.getroot()
+    if root.tag != "config":
+        print("Warning: unexpected ES-DE settings root; leaving it intact", file=sys.stderr)
+        sys.exit(0)
+else:
+    root = ET.Element("config")
+    tree = ET.ElementTree(root)
+
+if any(node.get("name") == "SplashScreenProgressBarColor" for node in root.findall("string")):
+    sys.exit(0)
+
+ET.SubElement(root, "string", name="SplashScreenProgressBarColor", value="00FFFFFF")
+ET.indent(tree, space="    ")
+fd, tmp = tempfile.mkstemp(prefix=".es_settings.", dir=os.path.dirname(path))
+try:
+    with os.fdopen(fd, "wb") as handle:
+        tree.write(handle, encoding="utf-8", xml_declaration=True)
+    os.chmod(tmp, 0o644)
+    os.replace(tmp, path)
+finally:
+    if os.path.exists(tmp):
+        os.unlink(tmp)
+PY_ESDE_SETTINGS
