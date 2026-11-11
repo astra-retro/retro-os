@@ -1,0 +1,11 @@
+[Unit]
+Description=Apply Astra default avatar after GNOME Initial Setup creates users
+
+[Timer]
+OnBootSec=30s
+OnUnitActiveSec=60s
+AccuracySec=10s
+Unit=astra-default-avatar.service
+
+[Install]
+WantedBy=timers.target

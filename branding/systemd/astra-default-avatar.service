@@ -1,0 +1,8 @@
+[Unit]
+Description=Apply Astra default avatar to newly generated GNOME initials
+After=accounts-daemon.service
+Wants=accounts-daemon.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/libexec/astra-retro-os/apply-generated-avatar
