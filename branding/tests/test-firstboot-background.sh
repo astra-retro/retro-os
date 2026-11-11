@@ -10,7 +10,7 @@ from pathlib import Path
 config = configparser.ConfigParser(interpolation=None)
 p = Path('branding/desktop/20-astra-gdm-background')
 assert config.read(p, encoding='utf-8') == [str(p)]
-expected = "file:///usr/share/backgrounds/astra-retro-os/wallpaper.png"
+expected = "file:///usr/share/backgrounds/astra-retro-os/wallpaper-pixel-art.png"
 background = config['org/gnome/desktop/background']
 screensaver = config['org/gnome/desktop/screensaver']
 assert background['picture-uri'] == f"'{expected}'"
@@ -30,5 +30,7 @@ assert "if [[ \"$mode\" == installed ]]; then" in common
 assert common.index('20-astra-gdm-background') < common.index('dconf update')
 assert '/usr/share/dconf/profile/gdm' in common
 assert 'script_dir/desktop/20-astra-gdm-background' in common
+assert 'wallpaper-pixel-art.png' in common
+assert 'python3 "$script_dir/gdm/install-greeter-wallpaper.py"' in common
 PY
 echo "GNOME Initial Setup GDM background checks passed"
