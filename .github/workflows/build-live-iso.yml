@@ -8,10 +8,19 @@ on:
         required: true
         default: latest
         type: string
+      tracking_tag:
+        description: "Optional update channel (version tags default to stable)"
+        required: false
+        default: ''
+        type: string
   workflow_call:
     inputs:
       image_ref:
         description: "Immutable GHCR OCI digest for the PR"
+        required: true
+        type: string
+      tracking_ref:
+        description: "Remote tag to track for installed OS updates"
         required: true
         type: string
       source_sha:
@@ -60,6 +69,8 @@ jobs:
         env:
           IMAGE_REF: ${{ inputs.image_ref || '' }}
           IMAGE_TAG: ${{ inputs.image_tag || 'latest' }}
+          TRACKING_REF: ${{ inputs.tracking_ref || '' }}
+          TRACKING_TAG: ${{ inputs.tracking_tag || '' }}
         run: |
           set -euo pipefail
           if [[ -n "$IMAGE_REF" ]]; then
@@ -75,7 +86,26 @@ jobs:
           fi
           [[ "$payload" == *@sha256:* ]] || { echo "::error::No OCI digest"; exit 1; }
           sudo podman pull "$payload"
+          if [[ -z "$TRACKING_REF" ]]; then
+            if [[ -z "$TRACKING_TAG" ]]; then
+              if [[ "$IMAGE_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+                TRACKING_TAG=stable
+              else
+                TRACKING_TAG="$IMAGE_TAG"
+              fi
+            fi
+            [[ "$TRACKING_TAG" =~ ^[a-zA-Z0-9_][a-zA-Z0-9_.-]{0,127}$ ]] || {
+              echo "::error::Invalid OCI tracking tag"; exit 1;
+            }
+            TRACKING_REF="ghcr.io/${GITHUB_REPOSITORY,,}:${TRACKING_TAG}"
+          fi
+          [[ "$TRACKING_REF" =~ ^ghcr\.io/[a-z0-9_.-]+/[a-z0-9_.-]+:[a-zA-Z0-9_][a-zA-Z0-9_.-]{0,127}$ ]] || {
+            echo "::error::Tracking ref must be a GHCR tag"; exit 1;
+          }
           echo "RETRO_PAYLOAD=$payload" >> "$GITHUB_ENV"
+          echo "RETRO_TRACKING_REF=$TRACKING_REF" >> "$GITHUB_ENV"
+          echo "Offline source: \`$payload\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "Updates follow: \`$TRACKING_REF\`" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Prepare Live ISO image
         shell: bash
@@ -86,6 +116,7 @@ jobs:
             --security-opt=label=disable \
             --secret id=ghcr-auth,src=/root/.docker/config.json \
             --build-arg "INSTALL_IMAGE_PAYLOAD=$RETRO_PAYLOAD" \
+            --build-arg "INSTALL_IMAGE_TRACKING_REF=$RETRO_TRACKING_REF" \
             -t localhost/retro-os-live:build \
             -f installer/Containerfile \
             .
@@ -126,7 +157,7 @@ jobs:
           mkdir -p dist
           cp "$ISO_PATH" dist/retro-os-live-amd64.iso
           (cd dist && sha256sum retro-os-live-amd64.iso > SHA256SUMS)
-          printf '%s\n' "$RETRO_PAYLOAD" > dist/retro-os-image-ref.txt
+          printf 'payload=%s\ntracking=%s\n' "$RETRO_PAYLOAD" "$RETRO_TRACKING_REF" > dist/retro-os-image-ref.txt
 
       - name: Upload Live ISO
         uses: actions/upload-artifact@v7

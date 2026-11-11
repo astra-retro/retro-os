@@ -8,10 +8,19 @@ on:
         required: true
         default: latest
         type: string
+      tracking-tag:
+        description: "Optional update channel (version tags default to stable)"
+        required: false
+        default: ''
+        type: string
   workflow_call:
     inputs:
       image_ref:
         description: "Immutable GHCR OCI digest for the PR"
+        required: true
+        type: string
+      tracking_ref:
+        description: "Remote tag to track for installed OS updates"
         required: true
         type: string
       source_sha:
@@ -64,6 +73,8 @@ jobs:
         env:
           IMAGE_REF: ${{ inputs.image_ref || '' }}
           IMAGE_TAG: ${{ inputs['image-tag'] || 'latest' }}
+          TRACKING_REF: ${{ inputs.tracking_ref || '' }}
+          TRACKING_TAG: ${{ inputs['tracking-tag'] || '' }}
         run: |
           set -euo pipefail
           if [[ -n "$IMAGE_REF" ]]; then
@@ -82,8 +93,29 @@ jobs:
             exit 1
           fi
           sudo podman pull "$digest"
+          if [[ -z "$TRACKING_REF" ]]; then
+            if [[ -z "$TRACKING_TAG" ]]; then
+              if [[ "$IMAGE_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+                TRACKING_TAG=stable
+              else
+                TRACKING_TAG="$IMAGE_TAG"
+              fi
+            fi
+            [[ "$TRACKING_TAG" =~ ^[a-zA-Z0-9_][a-zA-Z0-9_.-]{0,127}$ ]] || {
+              echo "::error::Invalid OCI tracking tag"; exit 1;
+            }
+            TRACKING_REF="ghcr.io/${GITHUB_REPOSITORY,,}:${TRACKING_TAG}"
+          fi
+          [[ "$TRACKING_REF" =~ ^ghcr\.io/[a-z0-9_.-]+/[a-z0-9_.-]+:[a-zA-Z0-9_][a-zA-Z0-9_.-]{0,127}$ ]] || {
+            echo "::error::Tracking ref must be a GHCR tag"; exit 1;
+          }
+          # Local tag aliases the exact pulled digest; the builder installs
+          # these exact bytes while recording a moving OCI update channel.
+          sudo podman tag "$digest" "$TRACKING_REF"
           echo "ref=$digest" >> "$GITHUB_OUTPUT"
-          echo "Building QCOW2 from $digest"
+          echo "tracking_ref=$TRACKING_REF" >> "$GITHUB_OUTPUT"
+          echo "QCOW2 uses digest: \`$digest\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "Updates follow: \`$TRACKING_REF\`" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Preflight osbuild mounts
         shell: bash
@@ -92,7 +124,7 @@ jobs:
       - name: Build QCOW2
         shell: bash
         env:
-          BOOTC_REF: ${{ steps.image.outputs.ref }}
+          BOOTC_REF: ${{ steps.image.outputs.tracking_ref }}
         run: |
           set -euo pipefail
 

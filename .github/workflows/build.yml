@@ -3,18 +3,21 @@ name: Build container image
 # Production image builds must be explicitly requested.
 on:
   workflow_dispatch:
+  push:
+    tags:
+      - 'v*'
 
 env:
   IMAGE_REGISTRY: "ghcr.io/${{ github.repository_owner }}" # do not edit
 
 concurrency:
-  group: production-oci-${{ github.run_id }}
+  group: production-oci-release
   cancel-in-progress: false
 
 jobs:
   build_push:
     name: Build and push image (main only)
-    if: github.ref == 'refs/heads/main'
+    if: (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main') || (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v'))
     runs-on: ubuntu-26.04
 
     permissions:
@@ -48,7 +51,18 @@ jobs:
       - name: Default Tag
         id: gen-default-tag
         run: |
-          DEFAULT_TAG=$(just generate-default-tag)
+          if [[ "$GITHUB_REF" == refs/tags/* ]]; then
+            DEFAULT_TAG="${GITHUB_REF#refs/tags/}"
+            [[ "$DEFAULT_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || {
+              echo "::error::Release tag must be vMAJOR.MINOR.PATCH"; exit 1;
+            }
+            git fetch --no-tags origin main
+            git merge-base --is-ancestor HEAD origin/main || {
+              echo "::error::Release tag commit is not on main"; exit 1;
+            }
+          else
+            DEFAULT_TAG=$(just generate-default-tag)
+          fi
 
           echo "DEFAULT_TAG=${DEFAULT_TAG}" >> $GITHUB_ENV
 
@@ -57,6 +71,10 @@ jobs:
           # Lowercase the image uri https://github.com/macbre/push-to-ghcr/issues/12
           echo "IMAGE_REGISTRY=${IMAGE_REGISTRY,,}" >> ${GITHUB_ENV}
           echo "IMAGE_NAME=${IMAGE_NAME,,}" >> ${GITHUB_ENV}
+
+      - name: Validate bootc tracking channels
+        shell: bash
+        run: bash .github/scripts/test-bootc-tracking.sh
 
       # This actually builds the container image
       - name: Build Image
@@ -93,6 +111,10 @@ jobs:
 
           echo "Tags for this Action..."
           echo "${alias_tags}"
+          # Stable moves on successful Git releases only.
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            alias_tags+=" stable"
+          fi
           echo "alias_tags=${alias_tags}" >> $GITHUB_OUTPUT
 
       - name: Tag Image
@@ -109,14 +131,14 @@ jobs:
       # They also check if the runner is on the default branch so that things like the merge queue (if you enable it), are going to work
       - name: Login to GitHub Container Registry
         uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4.8.0
-        if: github.event_name != 'pull_request' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
+        if: (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main') || (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v'))
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Push To GHCR
-        if: github.event_name != 'pull_request' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
+        if: (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main') || (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v'))
         id: push-image
         env:
           ALIAS_TAGS: ${{ steps.gen-build-tags.outputs.alias_tags }}
@@ -136,14 +158,14 @@ jobs:
       # to consume. For more details, review the image signing section of the README.
       - name: Install Cosign
         uses: sigstore/cosign-installer@756fe2d284c7292c4e9b62c8a28f1e5629c59532 # v4.1.3
-        if: github.event_name != 'pull_request' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
+        if: (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main') || (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v'))
         with:
           # be careful when upgrading major versions
           cosign-release: "v3.1.4"
 
       - name: Sign container image
         id: sign-image
-        if: github.event_name != 'pull_request' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
+        if: (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main') || (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v'))
         env:
           COSIGN_EXPERIMENTAL: false
           COSIGN_PRIVATE_KEY: ${{ secrets.SIGNING_SECRET }}

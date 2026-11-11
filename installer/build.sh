@@ -2,6 +2,13 @@
 # Build only the Live environment; the RetroOS payload is left unchanged.
 set -euo pipefail
 : "${INSTALL_IMAGE_PAYLOAD:?Must supply an immutable RetroOS image ref}"
+: "${INSTALL_IMAGE_TRACKING_REF:?Must supply the remote OCI update tag}"
+[[ "$INSTALL_IMAGE_PAYLOAD" =~ ^ghcr\.io/[a-z0-9_.-]+/[a-z0-9_.-]+@sha256:[a-f0-9]{64}$ ]] || {
+  echo "ERROR: Offline source must be a GHCR OCI digest" >&2; exit 1;
+}
+[[ "$INSTALL_IMAGE_TRACKING_REF" =~ ^ghcr\.io/[a-z0-9_.-]+/[a-z0-9_.-]+:[a-zA-Z0-9_][a-zA-Z0-9_.-]{0,127}$ ]] || {
+  echo "ERROR: Update source must be a GHCR tag" >&2; exit 1;
+}
 
 # This version deliberately uses a Fedora kernel for the Live environment.
 # It does NOT remove OGC or any hardware support from the installed image.
@@ -93,8 +100,15 @@ podman pull --authfile "${REGISTRY_AUTH_FILE}" "$INSTALL_IMAGE_PAYLOAD"
 podman image exists "$INSTALL_IMAGE_PAYLOAD"
 
 install -d /usr/share/anaconda /usr/share/applications /usr/lib/bootc-image-builder
-printf '\nostreecontainer --url=%s --transport=containers-storage --no-signature-verification\n' \
-  "$INSTALL_IMAGE_PAYLOAD" >> /usr/share/anaconda/interactive-defaults.ks
+# Fedora 45 bootc Kickstart keeps a local offline digest source distinct
+# from the remote tag recorded for future updates.
+printf '\nbootc --source-imgref containers-storage:%s --target-imgref %s\n' \
+  "$INSTALL_IMAGE_PAYLOAD" "$INSTALL_IMAGE_TRACKING_REF" \
+  >> /usr/share/anaconda/interactive-defaults.ks
+command -v ksvalidator >/dev/null || {
+  echo 'ERROR: Fedora Anaconda ksvalidator is missing' >&2; exit 1;
+}
+ksvalidator -v F45 /usr/share/anaconda/interactive-defaults.ks
 
 # Live session login, desktop, and initramfs.
 if [[ -e /etc/sysconfig/livesys ]]; then

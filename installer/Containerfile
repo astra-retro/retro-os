@@ -4,12 +4,14 @@ ARG LIVE_BASE=ghcr.io/ublue-os/silverblue-main:45
 FROM ${LIVE_BASE}
 
 ARG INSTALL_IMAGE_PAYLOAD
+ARG INSTALL_IMAGE_TRACKING_REF
 COPY installer/build.sh /usr/local/libexec/retro-os/build-live.sh
 COPY installer/iso.yaml /usr/share/retro-os/iso.yaml
 COPY branding/ /usr/share/retro-os/branding/
 RUN --mount=type=secret,id=ghcr-auth \
-    test -n "$INSTALL_IMAGE_PAYLOAD" && \
+    test -n "$INSTALL_IMAGE_PAYLOAD" && test -n "$INSTALL_IMAGE_TRACKING_REF" && \
     chmod 0755 /usr/local/libexec/retro-os/build-live.sh && \
     REGISTRY_AUTH_FILE=/run/secrets/ghcr-auth \
     INSTALL_IMAGE_PAYLOAD="$INSTALL_IMAGE_PAYLOAD" \
+    INSTALL_IMAGE_TRACKING_REF="$INSTALL_IMAGE_TRACKING_REF" \
     /usr/local/libexec/retro-os/build-live.sh
