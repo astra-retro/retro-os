@@ -102,6 +102,7 @@ jobs:
           IMAGE_TAG: ${{ needs.prepare.outputs.tag }}
         run: |
           set -euo pipefail
+          bash .github/scripts/test-bootc-tracking.sh
           just check
           just build retro-os "$IMAGE_TAG"
           just ostree-rechunk retro-os "$IMAGE_TAG"
@@ -128,8 +129,10 @@ jobs:
     permissions:
       contents: read
       packages: write
+      pull-requests: read
     outputs:
       image_ref: ${{ steps.push.outputs.image_ref }}
+      tracking_ref: ${{ steps.push.outputs.tracking_ref }}
     steps:
       - name: Download OCI built without write credentials
         uses: actions/download-artifact@v8
@@ -148,6 +151,9 @@ jobs:
         shell: bash
         env:
           IMAGE_TAG: ${{ needs.prepare.outputs.tag }}
+          PR_NUMBER: ${{ inputs.pr_number }}
+          PR_SHA: ${{ needs.prepare.outputs.sha }}
+          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           podman load -i retro-os.oci.tar
@@ -160,7 +166,20 @@ jobs:
             exit 1
           }
           ref="ghcr.io/${GITHUB_REPOSITORY,,}@${digest}"
+          # Keep reproducible builds on the digest; advance the moving PR tag
+          # only for the exact current head, never for an obsolete build.
+          current="$(gh api "repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}" --jq '.head.sha')"
+          if [[ "$current" == "$PR_SHA" ]]; then
+            tracking_ref="ghcr.io/${GITHUB_REPOSITORY,,}:pr-${PR_NUMBER}"
+            podman tag "$target" "$tracking_ref"
+            podman push "$tracking_ref"
+          else
+            tracking_ref="ghcr.io/${GITHUB_REPOSITORY,,}:${IMAGE_TAG}"
+            echo "PR head changed: immutable tag only" >> "$GITHUB_STEP_SUMMARY"
+          fi
+          echo "tracking_ref=$tracking_ref" >> "$GITHUB_OUTPUT"
           echo "image_ref=$ref" >> "$GITHUB_OUTPUT"
+          echo "Future updates: \`$tracking_ref\`" >> "$GITHUB_STEP_SUMMARY"
           echo "OCI payload: \`$ref\`" >> "$GITHUB_STEP_SUMMARY"
 
   iso:
@@ -173,6 +192,7 @@ jobs:
     uses: ./.github/workflows/build-live-iso.yml
     with:
       image_ref: ${{ needs.publish-oci.outputs.image_ref }}
+      tracking_ref: ${{ needs.publish-oci.outputs.tracking_ref }}
       source_sha: ${{ needs.prepare.outputs.sha }}
 
   qcow2:
@@ -185,4 +205,5 @@ jobs:
     uses: ./.github/workflows/build-disk.yml
     with:
       image_ref: ${{ needs.publish-oci.outputs.image_ref }}
+      tracking_ref: ${{ needs.publish-oci.outputs.tracking_ref }}
       source_sha: ${{ needs.prepare.outputs.sha }}
