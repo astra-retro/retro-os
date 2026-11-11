@@ -19,6 +19,37 @@ dnf5 -y install glibc-langpack-fr langpacks-fr
 bash /usr/share/retro-os/branding/install-common.sh /usr/share/retro-os/branding/assets live
 bash /usr/share/retro-os/branding/install-live.sh /usr/share/retro-os/branding/live
 
+# Fedora Atomic live images expose /mnt as a symlink to /var/mnt. Anaconda
+# passes --root=/mnt/sysroot to systemd-tmpfiles, while systemd canonicalizes
+# its SELinux root to /var/mnt/sysroot. Relabelling then fails with code 73:
+# "Path ... is not under root ..., refusing SELinux label fix."
+# Canonicalize only the root argument in the Live Anaconda implementation.
+# Keep SELinux enabled and leave the installed OSTree payload untouched.
+python3 - <<'PY'
+from pathlib import Path
+
+paths = sorted(Path("/usr").glob(
+    "lib*/python*/site-packages/pyanaconda/modules/payloads/"
+    "payload/rpm_ostree/installation.py"
+))
+if len(paths) != 1:
+    raise SystemExit(
+        f"Expected exactly one Anaconda RPM-OSTree source file, found: {paths}"
+    )
+
+source_path = paths[0]
+source = source_path.read_text(encoding="utf-8")
+old = '"--root=" + self._sysroot,'
+new = '"--root=" + os.path.realpath(self._sysroot),'
+if source.count(old) != 1 or "\nimport os\n" not in source:
+    raise SystemExit("Anaconda source changed; refusing to apply an unsafe patch")
+
+patched = source.replace(old, new, 1)
+compile(patched, str(source_path), "exec")
+source_path.write_text(patched, encoding="utf-8")
+print(f"Applied Astra SELinux tmpfiles root-path fix: {source_path}")
+PY
+
 # Brand the Fedora Live welcome screen.
 welcome=/usr/share/anaconda/gnome/fedora-welcome
 
