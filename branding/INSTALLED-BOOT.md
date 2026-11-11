@@ -121,7 +121,10 @@ dconf database, whereas the GDM session reads the `gdm` profile/database.
 The installed OCI image now ships
 `branding/desktop/20-astra-gdm-background` to
 `/etc/dconf/db/gdm.d/20-astra-gdm-background`, setting the light/dark
-background and login logo to the **same Astra assets** as the normal desktop.
+background URI to the **same Astra wallpaper** as the normal desktop.
+The `org.gnome.login-screen.logo` setting is explicitly cleared (`logo=''`)
+because it places a logo *in front of the greeter*, not behind it: previously,
+the full-size 512px Astra icon could obstruct the password prompt.
 `install-common.sh` ensures the `gdm` database is in GDM's dconf profile,
 preserving any existing vendor/admin profile, and runs `dconf update`.
 
@@ -175,3 +178,27 @@ gsettings get org.gnome.shell welcome-dialog-last-shown-version
 Expected: `'4294967295'`. For existing user data with a lower stored
 value, `gsettings reset org.gnome.shell welcome-dialog-last-shown-version`
 restores the new system default; sign out/in afterward.
+
+### GDM login screen: obstructing logo regression (fixed)
+
+`org.gnome.login-screen.logo` is a **foreground logo**, unrelated to the
+wallpaper. Do not set it to `/usr/share/icons/hicolor/512x512/apps/astra-retro-os.png`.
+The installed GDM profile now writes `logo=''` so an update removes the
+previous oversized logo even on an existing installation. The logo remains
+available in GNOME Settings, the wallpaper overlay and Plymouth.
+
+The `org.gnome.desktop.background` settings in the GDM dconf database
+are best-effort GNOME Initial Setup defaults; GNOME Shell's actual greeter
+background may remain a theme-defined backdrop and requires a separate,
+version-compatible solution. Removing the obstructing foreground image
+restores the login UI independently of whether wallpaper theming is available.
+
+After updating the installed image, reboot rather than restarting GDM in
+an active session. To verify from a system with the fixed deployment:
+
+```bash
+DCONF_PROFILE=gdm gsettings get org.gnome.login-screen logo
+```
+
+Expected: `''`. If the greeter session already cached its prior dconf
+value, a full reboot ensures it is recreated.

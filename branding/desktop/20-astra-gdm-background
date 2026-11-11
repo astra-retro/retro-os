@@ -10,5 +10,9 @@ picture-options='zoom'
 picture-uri='file:///usr/share/backgrounds/astra-retro-os/wallpaper.png'
 picture-options='zoom'
 
+# GNOME's login-screen.logo is a foreground greeter badge, NOT a
+# wallpaper. The large 512px Astra application icon hid the login prompt.
+# Explicitly clear it so updates to already installed systems revert the
+# previously generated GDM dconf value instead of leaving a stale logo.
 [org/gnome/login-screen]
-logo='/usr/share/icons/hicolor/512x512/apps/astra-retro-os.png'
+logo=''
