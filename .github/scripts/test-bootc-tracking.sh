@@ -32,6 +32,9 @@ assert 'sudo podman pull "$digest"' in disk
 ks = files["installer/build.sh"]
 assert 'bootc --source-imgref containers-storage:%s --target-imgref %s' in ks
 assert 'ksvalidator -v F45' in ks
+assert 'squashfs-tools xorriso jq podman pykickstart' in ks, (
+    'The Fedora pykickstart RPM supplies the ksvalidator binary'
+)
 assert "ostreecontainer --url=" not in ks
 assert 'INSTALL_IMAGE_TRACKING_REF' in files["installer/Containerfile"]
 

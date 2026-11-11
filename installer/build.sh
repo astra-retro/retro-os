@@ -17,7 +17,7 @@ dnf5 -y install \
     libblockdev-btrfs libblockdev-lvm libblockdev-dm \
     dracut-live livesys-scripts \
     grub2-efi-x64-cdboot grub2-pc-modules \
-    squashfs-tools xorriso jq podman \
+    squashfs-tools xorriso jq podman pykickstart \
     gnome-shell-extension-dash-to-dock
 
 dnf5 -y install plymouth-plugin-script dconf ptyxis
@@ -105,8 +105,10 @@ install -d /usr/share/anaconda /usr/share/applications /usr/lib/bootc-image-buil
 printf '\nbootc --source-imgref containers-storage:%s --target-imgref %s\n' \
   "$INSTALL_IMAGE_PAYLOAD" "$INSTALL_IMAGE_TRACKING_REF" \
   >> /usr/share/anaconda/interactive-defaults.ks
+# The pykickstart RPM (not python3-kickstart) provides /usr/bin/ksvalidator.
+# Validate the generated Kickstart in the same Fedora 45 image as Anaconda.
 command -v ksvalidator >/dev/null || {
-  echo 'ERROR: Fedora Anaconda ksvalidator is missing' >&2; exit 1;
+  echo 'ERROR: ksvalidator not found; pykickstart must be installed' >&2; exit 1;
 }
 ksvalidator -v F45 /usr/share/anaconda/interactive-defaults.ks
 
