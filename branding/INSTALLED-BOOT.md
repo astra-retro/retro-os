@@ -13,8 +13,13 @@ The GRUB disk contents are synchronized separately.
   modules to `/boot/grub2`, then writes a managed fragment into
   `/boot/grub2/user.cfg` (bootupd static GRUB) or `custom.cfg`
   (legacy Fedora GRUB). Existing custom lines are kept.
-- The normal menu is hidden for five seconds and can be revealed with
-  **Escape** or **Shift**. Recovery/one-shot GRUB flags can show it.
+- The installed graphical splash uses the same five-second
+  `sleep --interruptible` mechanism as the Live ISO, keeping the GRUB
+  background visible. Press **Escape** during the delay to display the menu
+  indefinitely; otherwise it boots the normal BLS default without displaying
+  a menu. Recovery/one-shot requests show a regular ten-second menu.
+  When `sleep` or the background is unavailable the script falls back to a
+  visible timed menu, so boot selection remains possible.
 - Normal BLS/OSTree boot entries are kept unchanged, including their default
   selection and rollback semantics. A low-sorting generated BLS entry
   `0000-astra-retro-debug-0.conf` starts the active/staged deployment with
