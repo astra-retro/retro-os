@@ -37,6 +37,26 @@ test -d "$dock_extension" || {
 }
 install -m 0644 "$script_dir/desktop/25-astra-dock" /etc/dconf/db/local.d/25-astra-dock
 
+if [[ "$mode" == installed ]]; then
+  # GNOME Initial Setup creates the user in a special GDM-owned session,
+  # not the ordinary GNOME desktop session. GDM has a separate dconf profile.
+  # Preserve a vendor/admin-provided profile and only attach the gdm database.
+  install -d /etc/dconf/profile /etc/dconf/db/gdm.d
+  gdm_profile=/etc/dconf/profile/gdm
+  if [[ ! -e "$gdm_profile" ]]; then
+    if [[ -s /usr/share/dconf/profile/gdm ]]; then
+      cp -a /usr/share/dconf/profile/gdm "$gdm_profile"
+    else
+      printf 'user-db:user\nsystem-db:gdm\nfile-db:/usr/share/gdm/greeter-dconf-defaults\n' > "$gdm_profile"
+    fi
+  fi
+  if ! grep -qxF 'system-db:gdm' "$gdm_profile"; then
+    printf '\nsystem-db:gdm\n' >> "$gdm_profile"
+  fi
+  install -m 0644 "$script_dir/desktop/20-astra-gdm-background" \
+    /etc/dconf/db/gdm.d/20-astra-gdm-background
+fi
+
 cat > /etc/dconf/db/local.d/20-astra-retro-os <<'DCONF'
 [org/gnome/desktop/background]
 picture-uri='file:///usr/share/backgrounds/astra-retro-os/wallpaper.png'
