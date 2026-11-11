@@ -81,6 +81,18 @@ if [[ "$mode" == installed ]]; then
   install -m 0644 "$script_dir/desktop/27-astra-always-on" \
     /etc/dconf/db/gdm.d/27-astra-always-on
 
+  # Create a circular-safe Astra avatar (the original square logo is kept).
+  # AccountsService templates seed new users, and the timer converts only
+  # GNOME-generated initials avatars after Initial Setup saves its icon.
+  python3 "$script_dir/accounts/install-default-avatar.py" "$assets/astra-retro-os-logo.svg"
+  install -D -m 0755 "$script_dir/accounts/apply-generated-avatar.py" \
+    /usr/libexec/astra-retro-os/apply-generated-avatar
+  install -D -m 0644 "$script_dir/systemd/astra-default-avatar.service" \
+    /usr/lib/systemd/system/astra-default-avatar.service
+  install -D -m 0644 "$script_dir/systemd/astra-default-avatar.timer" \
+    /usr/lib/systemd/system/astra-default-avatar.timer
+  systemctl enable astra-default-avatar.timer
+
   # Block system-managed automatic suspend (including lid switch) and the
   # sleep targets. These restrictions can be changed by an administrator.
   install -D -m 0644 "$script_dir/systemd/60-astra-no-suspend.conf" \

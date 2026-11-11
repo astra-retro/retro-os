@@ -85,6 +85,7 @@ jobs:
           bash branding/tests/test-dock.sh
           bash branding/tests/test-firstboot-background.sh
           bash branding/tests/test-gdm-wallpaper.sh
+          bash branding/tests/test-account-avatar.sh
           bash branding/tests/test-settings-donate.sh
           bash branding/tests/test-welcome-tour.sh
           bash branding/tests/test-power-ssh.sh
