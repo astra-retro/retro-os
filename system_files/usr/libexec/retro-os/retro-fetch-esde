@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+set -euo pipefail
+URL='https://packages.es-de.org/release/3.5.0/ES-DE_x64.AppImage'
+APPDIR="$HOME/Applications"
+APP="$APPDIR/ES-DE.AppImage"
+mkdir -p "$APPDIR"
+if [[ ! -s "$APP" ]]; then
+  tmp="$(mktemp "$APPDIR/.es-de.XXXXXXXX")"
+  trap 'rm -f "$tmp"' EXIT
+  curl --fail --location --retry 3 --show-error --output "$tmp" "$URL"
+  [[ -s "$tmp" ]] || exit 1
+  chmod 0755 "$tmp"
+  mv -f "$tmp" "$APP"
+  trap - EXIT
+fi

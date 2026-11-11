@@ -1,0 +1,11 @@
+[Unit]
+Description=RetroOS first-login emulator initialization (per user)
+Documentation=https://github.com/astra-retro/retro-os
+
+[Service]
+Type=oneshot
+ExecStart=/usr/libexec/retro-os/retro-emulation-setup
+TimeoutStartSec=0
+
+[Install]
+WantedBy=default.target

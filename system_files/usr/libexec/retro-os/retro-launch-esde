@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+set -euo pipefail
+/usr/libexec/retro-os/retro-fetch-esde
+exec "$HOME/Applications/ES-DE.AppImage" "$@"

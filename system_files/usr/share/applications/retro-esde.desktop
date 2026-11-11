@@ -1,0 +1,7 @@
+[Desktop Entry]
+Type=Application
+Name=ES-DE (RetroOS)
+Comment=Start ES-DE retro game frontend
+Exec=/usr/libexec/retro-os/retro-launch-esde
+Terminal=false
+Categories=Game;Emulator;

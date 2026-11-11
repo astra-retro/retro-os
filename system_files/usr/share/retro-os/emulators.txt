@@ -1,0 +1,7 @@
+# Required Flathub applications, installed per user at first login
+org.libretro.RetroArch
+org.DolphinEmu.dolphin-emu
+net.pcsx2.PCSX2
+net.rpcs3.RPCS3
+app.xemu.xemu
+# DuckStation is NOT listed: its old Flathub package has been removed.

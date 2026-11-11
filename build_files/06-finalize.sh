@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 #
-# Final cleanup, service configuration, and image finalization for Bazzite.
+# Final cleanup, service configuration, and image finalization.
 #
 set -xeuo pipefail
 
-echo "::group::Finalize bazzite image"
+echo "::group::Finalize image"
 trap 'echo "::endgroup::"' EXIT
 
 # -- Basic cleanup and setup --

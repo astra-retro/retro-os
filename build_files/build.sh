@@ -6,7 +6,8 @@ set -ouex pipefail
 /ctx/02-initialize.sh
 /ctx/03-global-remove.sh
 /ctx/04-install-packages.sh
-/ctx/05-finalize.sh
+/ctx/05-retro-emulation.sh
+/ctx/06-finalize.sh
 
 /ctx/reset-mtimes.sh
 

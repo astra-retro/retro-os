@@ -1,0 +1,51 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Never run from root, the image build or an uninitialized user account.
+if [[ "$(id -u)" == 0 || -z "${HOME:-}" ]]; then
+  echo 'retro-emulation-setup must run as an ordinary user' >&2
+  exit 1
+fi
+
+STATE="${XDG_STATE_HOME:-$HOME/.local/state}/retro-os"
+LOG="${STATE}/setup.log"
+MARK="${STATE}/emulators-v1.done"
+mkdir -p "$STATE" "$HOME/Emulation" "$HOME/Applications"
+for dir in roms bios saves storage tools; do
+  mkdir -p "$HOME/Emulation/$dir"
+done
+
+if [[ -f "$MARK" ]]; then
+  exit 0
+fi
+
+exec 9>"$STATE/setup.lock"
+flock -n 9 || exit 0
+[[ -f "$MARK" ]] && exit 0
+
+{
+  echo "[$(date -Is)] Installing RetroOS emulator Flatpaks"
+  flatpak remote-add --user --if-not-exists flathub \
+    https://flathub.org/repo/flathub.flatpakrepo
+
+  # Required emulators. No --or-update: user controls future updates.
+  apps=(
+    org.libretro.RetroArch
+    org.DolphinEmu.dolphin-emu
+    net.pcsx2.PCSX2
+    net.rpcs3.RPCS3
+    app.xemu.xemu
+  )
+  for app in "${apps[@]}"; do
+    if ! flatpak info --user "$app" >/dev/null 2>&1; then
+      flatpak install --user --noninteractive --assumeyes flathub "$app"
+    fi
+  done
+
+  /usr/libexec/retro-os/retro-fetch-esde
+
+  # Installable offline users can later run the same helper manually;
+  # only mark success once all required applications exist.
+  touch "$MARK"
+  echo "[$(date -Is)] Setup completed"
+} >>"$LOG" 2>&1
