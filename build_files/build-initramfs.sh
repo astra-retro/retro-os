@@ -44,11 +44,42 @@ DRACUT_NO_XATTR=1 /usr/bin/dracut \
     --add ostree \
     --add fido2 \
     --add plymouth \
+    --add astra-plymouth \
     -f "${INITRAMFS}"
 
 # Copy back to preserve the original os-release permissions.
 cp "${TMP_OS_RELEASE}" "${OS_RELEASE}"
 rm "${TMP_OS_RELEASE}"
+
+# Detect silent regression in generic initramfs builds: the stock Dracut
+# Plymouth module can select text/details instead of the custom Astra theme.
+# Failing the OCI build is safer than shipping another broken boot splash.
+test -s "${INITRAMFS}"
+if [[ "$(plymouth-set-default-theme)" != "astra-retro-os" ]]; then
+    echo 'ERROR: Astra Plymouth is not the selected default theme' >&2
+    exit 1
+fi
+initramfs_manifest="$(mktemp --tmpdir 'astra-initramfs-XXXXXXXXXX')"
+trap 'rm -f "$initramfs_manifest"; echo "::endgroup::"' EXIT
+lsinitrd "${INITRAMFS}" > "$initramfs_manifest"
+for required in \
+    'usr/share/plymouth/themes/astra-retro-os/astra-retro-os.plymouth' \
+    'usr/share/plymouth/themes/astra-retro-os/astra-retro-os.script' \
+    'usr/share/plymouth/themes/astra-retro-os/plymouth-splash.png' \
+    'usr/share/plymouth/themes/astra-retro-os/astra-title.png' \
+    'usr/share/plymouth/themes/astra-retro-os/spinner.png' \
+    'usr/share/plymouth/themes/default.plymouth'; do
+    if ! grep -Fq "$required" "$initramfs_manifest"; then
+        echo "ERROR: Missing Plymouth asset in installed initramfs: $required" >&2
+        exit 1
+    fi
+done
+if ! grep -Eq '(usr/)?lib(64)?/plymouth/script[.]so' "$initramfs_manifest"; then
+    echo 'ERROR: Missing Plymouth script plugin in installed initramfs' >&2
+    exit 1
+fi
+echo 'Astra Plymouth script theme and plugin verified in installed initramfs'
+rm -f "$initramfs_manifest"
 
 # Restrict read/write access to root only.
 chmod 0600 "${INITRAMFS}"
