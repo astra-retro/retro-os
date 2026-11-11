@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# Generate image metadata and update os-release for the Bazzite image.
+# Generate image metadata and update os-release for the image.
 #
 set -xeuo pipefail
 

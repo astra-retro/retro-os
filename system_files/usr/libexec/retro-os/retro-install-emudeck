@@ -1,0 +1,33 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# EmuDeck is OPTIONAL. This only downloads the upstream GUI AppImage into
+# the user's persistent profile. It does not run install.sh / rpm-ostree,
+# install Steam, or silently run EmuDeck's own setup wizard.
+[[ "$(id -u)" != 0 ]] || { echo 'Use a normal user' >&2; exit 1; }
+APPDIR="$HOME/Applications"
+APP="$APPDIR/EmuDeck.AppImage"
+mkdir -p "$APPDIR"
+if [[ ! -s "$APP" ]]; then
+  metadata="$(mktemp)"
+  tmp="$(mktemp "$APPDIR/.emudeck.XXXXXXXX")"
+  trap 'rm -f "$metadata" "$tmp"' EXIT
+  curl --fail --location --retry 3 --silent --show-error \
+    https://api.github.com/repos/EmuDeck/emudeck-electron/releases/latest \
+    -o "$metadata"
+  url="$(python3 - "$metadata" <<'PY'
+import json,sys
+with open(sys.argv[1],encoding='utf-8') as f: data=json.load(f)
+assets=[a['browser_download_url'] for a in data.get('assets',[]) if a.get('name','').endswith('.AppImage') and not any(x in a.get('name','').lower() for x in ('arm64','aarch64'))]
+if len(assets)!=1: raise SystemExit('Could not uniquely select EmuDeck x86_64 AppImage')
+print(assets[0])
+PY
+)"
+  curl --fail --location --retry 3 --show-error --output "$tmp" "$url"
+  [[ -s "$tmp" ]] || exit 1
+  chmod 0755 "$tmp"
+  mv -f "$tmp" "$APP"
+  rm -f "$metadata"
+  trap - EXIT
+fi
+exec "$APP" "$@"

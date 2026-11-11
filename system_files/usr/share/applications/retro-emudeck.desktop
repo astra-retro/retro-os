@@ -1,0 +1,7 @@
+[Desktop Entry]
+Type=Application
+Name=EmuDeck (optional)
+Comment=Download and open EmuDeck without installing Steam
+Exec=/usr/libexec/retro-os/retro-install-emudeck
+Terminal=false
+Categories=Game;Settings;

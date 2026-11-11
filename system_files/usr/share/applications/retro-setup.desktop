@@ -1,0 +1,7 @@
+[Desktop Entry]
+Type=Application
+Name=Retry RetroOS emulator setup
+Comment=Install missing Flatpak emulators in this user profile
+Exec=/usr/libexec/retro-os/retro-emulation-setup
+Terminal=true
+Categories=Game;Settings;
