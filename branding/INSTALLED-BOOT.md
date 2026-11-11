@@ -148,3 +148,30 @@ Use a **fresh installation with no user** to validate the original symptom.
 ## Settings — remove GNOME donation row (installed only)
 
 GNOME's **Settings > System > About** contains a compiled `Support GNOME` / `Donate` group, not a dconf option. The installed image overlays only the `cc-about-page.ui` resource via GLib's `G_RESOURCE_OVERLAYS`; the GNOME Settings binary and other pages are unchanged. The overlay is compiled from GNOME's GPL-2.0-or-later original Blueprint template for GNOME 49/50 or 51, with only that group removed, using `blueprint-compiler` during image build. An unrecognized GNOME major version fails the image build until templates can be reviewed. The resource overlay is supplied via `/usr/lib/environment.d/70-astra-settings-ui.conf`; log out and back in to load it in the user session. Only installed OS is changed; Live is unchanged. Recheck after upstream GNOME upgrades.
+
+## Disable the optional GNOME Welcome Tour on first desktop login
+
+The installed image ships `branding/desktop/26-astra-no-welcome-tour`
+as an **unlocked** dconf default in the `local` database:
+`org.gnome.shell welcome-dialog-last-shown-version='4294967295'`.
+GNOME Shell treats a very high last-shown version as a request not to
+display the optional welcome dialog. It is applied only to the installed
+OCI image, and `install-common.sh` verifies that the running GNOME Shell
+schema provides this key, failing the image build if compatibility changes.
+
+This intentionally **does not** disable `gnome-initial-setup`, change
+`InitialSetupEnable`, remove any GDM services, or skip language, timezone
+and initial-user creation. It leaves GNOME Tour available for manual use
+and lets users override the default. Because an existing user's personal
+dconf database has precedence, it may still be necessary to reset the
+personal key for a machine previously configured.
+
+To verify as a freshly created desktop user:
+
+```bash
+gsettings get org.gnome.shell welcome-dialog-last-shown-version
+```
+
+Expected: `'4294967295'`. For existing user data with a lower stored
+value, `gsettings reset org.gnome.shell welcome-dialog-last-shown-version`
+restores the new system default; sign out/in afterward.

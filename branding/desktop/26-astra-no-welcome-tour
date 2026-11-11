@@ -1,0 +1,5 @@
+# Show the normal Astra desktop directly after first-login setup.
+# GNOME Shell interprets a very high last-shown version as disabling the
+# optional welcome/tour dialog. Does not disable GNOME Initial Setup.
+[org/gnome/shell]
+welcome-dialog-last-shown-version='4294967295'
