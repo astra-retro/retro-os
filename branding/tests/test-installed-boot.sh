@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
-script="$(cd "$(dirname "$0")/.." && pwd)/sync-installed-boot.sh"
+script_dir="$(cd "$(dirname "$0")/.." && pwd)"
+script="$script_dir/sync-installed-boot.sh"
 tmp="$(mktemp -d)"
 trap 'rm -rf "$tmp"' EXIT
 root="$tmp/root"
@@ -33,7 +34,17 @@ test -s "$root/boot/grub2/astra-background.png"
 test -s "$root/boot/grub2/x86_64-efi/gfxterm_background.mod"
 grep -Fq 'set my_grub_setting=yes' "$usercfg"
 grep -Fq 'background_image -m stretch' "$usercfg"
-grep -Fq 'set timeout_style=hidden' "$usercfg"
+# Installed GRUB must mirror the interruptible Live splash/menu handling.
+grep -Fq 'if sleep --interruptible 5; then' "$usercfg"
+grep -Fq 'set timeout_style=menu' "$usercfg"
+grep -Fq 'set timeout=0' "$usercfg"
+grep -Fq 'set timeout=-1' "$usercfg"
+grep -Fq 'set astra_background_ok=0' "$usercfg"
+grep -Fq 'set astra_background_ok=1' "$usercfg"
+grep -Fq 'set timeout=10' "$usercfg"
+! grep -Fq 'set timeout_style=hidden' "$usercfg"
+# The live ISO already uses this same interruptible 5-second wait.
+grep -Fq 'sleep --interruptible 5' "$script_dir/../installer/titanoboa/build_iso_branded.sh"
 grep -Fq 'ostree=/ostree/boot.1/astra/a/0' "$debug"
 grep -Fq 'plymouth.enable=0' "$debug"
 ! grep -Eq '(^| )quiet( |$)' "$debug"

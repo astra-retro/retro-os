@@ -67,6 +67,7 @@ fi
 cat >> "$tmp" <<'GRUB'
 # BEGIN ASTRA RETRO OS INSTALLED BRANDING
 # GRUB root may refer to /boot or to the root filesystem.
+set astra_background_ok=0
 set astra_boot_prefix=
 if search --no-floppy --file --set=astra_boot /grub2/astra-background.png; then
     set astra_boot_prefix="($astra_boot)/grub2"
@@ -88,18 +89,41 @@ if [ -n "$astra_boot_prefix" ]; then
     set gfxpayload=keep
     set menu_color_normal=white/black
     set menu_color_highlight=black/light-cyan
-    background_image -m stretch "$astra_boot_prefix/astra-background.png"
+    if background_image -m stretch "$astra_boot_prefix/astra-background.png"; then
+        set astra_background_ok=1
+    fi
     set prefix=$astra_previous_prefix
 fi
 # Do not override saved_entry/next_entry: bootc manages deployment selection.
 # The normal OSTree/BLS entry remains the default, the debug entry sorts last.
-# Escape or Shift opens the menu within this window.
+#
+# On the Live ISO we use interruptible sleep to keep the splash visible while
+# waiting for Escape, then expose the menu indefinitely. Use the SAME working
+# behavior here instead of timeout_style=hidden: the latter may auto-boot
+# without exposing the menu in the firmware/GRUB combination used by installed
+# systems. The sleep happens while the GRUB config is being read; the final
+# menu timeout takes effect once blscfg has populated the BLS entries.
+set timeout_style=menu
 if [ "${menu_show_once}" = 1 ] || [ "${boot_success}" = 0 ]; then
-    set timeout_style=menu
+    # Recovery and explicit one-shot menu requests should not be hidden.
+    set timeout=10
+elif [ "${astra_background_ok}" = 1 ]; then
+    if insmod sleep; then
+        if sleep --interruptible 5; then
+            # 5 seconds with no key: boot the normal default immediately.
+            set timeout=0
+        else
+            # Escape (or supported interrupt keys): show menu indefinitely.
+            set timeout=-1
+        fi
+    else
+        # Fail open: if this GRUB build lacks sleep, keep the menu accessible.
+        set timeout=5
+    fi
 else
-    set timeout_style=hidden
+    # If graphics cannot be loaded, keep a visible normal boot menu.
+    set timeout=5
 fi
-set timeout=5
 # END ASTRA RETRO OS INSTALLED BRANDING
 GRUB
 if ! cmp -s "$tmp" "$config"; then
