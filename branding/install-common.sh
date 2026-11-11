@@ -38,6 +38,15 @@ test -d "$dock_extension" || {
 install -m 0644 "$script_dir/desktop/25-astra-dock" /etc/dconf/db/local.d/25-astra-dock
 
 if [[ "$mode" == installed ]]; then
+  # Only suppress GNOME Shell's optional first-login Welcome Tour dialog.
+  # The GDM-hosted language/timezone/user setup must remain enabled.
+  if ! gsettings list-keys org.gnome.shell | grep -Fxq 'welcome-dialog-last-shown-version'; then
+    echo 'ERROR: GNOME Shell no longer provides the Welcome Tour preference' >&2
+    exit 1
+  fi
+  install -m 0644 "$script_dir/desktop/26-astra-no-welcome-tour" \
+    /etc/dconf/db/local.d/26-astra-no-welcome-tour
+
   # GNOME Initial Setup creates the user in a special GDM-owned session,
   # not the ordinary GNOME desktop session. GDM has a separate dconf profile.
   # Preserve a vendor/admin-provided profile and only attach the gdm database.
