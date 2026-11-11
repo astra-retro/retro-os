@@ -83,6 +83,7 @@ jobs:
           bash branding/tests/test-installed-boot.sh
           bash branding/tests/test-plymouth-boot.sh
           bash branding/tests/test-dock.sh
+          bash branding/tests/test-firstboot-background.sh
 
       - name: Build Image
         id: build-image

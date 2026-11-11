@@ -111,3 +111,36 @@ gsettings set org.gnome.shell.extensions.dash-to-dock dock-fixed true
 gsettings set org.gnome.shell.extensions.dash-to-dock autohide false
 gsettings set org.gnome.shell.extensions.dash-to-dock intellihide false
 ```
+
+## First-boot language / timezone / user creation (GNOME Initial Setup)
+
+Before a user account exists, GNOME Initial Setup runs inside a **special GDM
+session**, not the ordinary desktop session. The latter uses the `local`
+dconf database, whereas the GDM session reads the `gdm` profile/database.
+
+The installed OCI image now ships
+`branding/desktop/20-astra-gdm-background` to
+`/etc/dconf/db/gdm.d/20-astra-gdm-background`, setting the light/dark
+background and login logo to the **same Astra assets** as the normal desktop.
+`install-common.sh` ensures the `gdm` database is in GDM's dconf profile,
+preserving any existing vendor/admin profile, and runs `dconf update`.
+
+This does not remove or bypass GNOME Initial Setup and is applied to the
+installed image only. Its dconf settings do not lock user preferences.
+
+**Important:** GNOME Shell's GDM/Initial Setup interface may render a
+built-in or blurred background despite a configured wallpaper. The patch
+configures supported GSettings values, but the exact first-boot visual
+appearance on Fedora 45 requires a real fresh-install VM test. Do not claim
+full visual parity until verified.
+
+Checks on the installed image:
+
+```bash
+cat /etc/dconf/profile/gdm
+cat /etc/dconf/db/gdm.d/20-astra-gdm-background
+ls -l /etc/dconf/db/gdm /usr/share/backgrounds/astra-retro-os/wallpaper.png
+```
+
+A normal login after the first boot does not retest GNOME Initial Setup.
+Use a **fresh installation with no user** to validate the original symptom.
