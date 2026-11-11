@@ -144,3 +144,7 @@ ls -l /etc/dconf/db/gdm /usr/share/backgrounds/astra-retro-os/wallpaper.png
 
 A normal login after the first boot does not retest GNOME Initial Setup.
 Use a **fresh installation with no user** to validate the original symptom.
+
+## Settings — remove GNOME donation row (installed only)
+
+GNOME's **Settings > System > About** contains a compiled `Support GNOME` / `Donate` group, not a dconf option. The installed image overlays only the `cc-about-page.ui` resource via GLib's `G_RESOURCE_OVERLAYS`; the GNOME Settings binary and other pages are unchanged. The overlay is compiled from GNOME's GPL-2.0-or-later original Blueprint template for GNOME 49/50 or 51, with only that group removed, using `blueprint-compiler` during image build. An unrecognized GNOME major version fails the image build until templates can be reviewed. The resource overlay is supplied via `/usr/lib/environment.d/70-astra-settings-ui.conf`; log out and back in to load it in the user session. Only installed OS is changed; Live is unchanged. Recheck after upstream GNOME upgrades.
