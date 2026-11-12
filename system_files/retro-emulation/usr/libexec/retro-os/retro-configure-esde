@@ -41,40 +41,91 @@ else
   echo "Warning: missing Astra ES-DE splash asset: $source_svg" >&2
 fi
 
-# Only add the vendor default. Leave a previously personalized value alone.
+# ES-DE 3.5.0 stores a *fragment* of XML elements without a root.
+# A <config> root is invalid in ES-DE and makes it reset to its red default.
+# Edit only the vendor color, preserving all other settings and custom colors.
 python3 - "$settings_dir/es_settings.xml" <<'PY_ESDE_SETTINGS'
 import os
+import re
 import sys
 import tempfile
 import xml.etree.ElementTree as ET
 
 path = sys.argv[1]
-if os.path.exists(path):
-    try:
-        tree = ET.parse(path)
-    except ET.ParseError as exc:
-        print(f"Warning: refusing to overwrite invalid ES-DE settings: {exc}", file=sys.stderr)
-        sys.exit(0)
-    root = tree.getroot()
-    if root.tag != "config":
-        print("Warning: unexpected ES-DE settings root; leaving it intact", file=sys.stderr)
-        sys.exit(0)
-else:
-    root = ET.Element("config")
-    tree = ET.ElementTree(root)
+cyan = '00FFFFFF'  # RRGGBBAA
+try:
+    with open(path, 'r', encoding='utf-8') as file:
+        original = file.read()
+except FileNotFoundError:
+    original = ''
 
-if any(node.get("name") == "SplashScreenProgressBarColor" for node in root.findall("string")):
+declaration = re.compile(r'^\s*<\?xml\s+[^?]*\?>', re.I)
+header = declaration.match(original)
+body = declaration.sub('', original, count=1)
+try:
+    root = ET.fromstring('<astra-settings>' + body + '</astra-settings>')
+except ET.ParseError as exc:
+    print(f'Warning: preserving invalid ES-DE settings: {exc}', file=sys.stderr)
+    sys.exit(0)
+if (root.text or '').strip() or any((node.tail or '').strip() for node in root):
+    print('Warning: unexpected text in ES-DE settings; leaving file untouched', file=sys.stderr)
     sys.exit(0)
 
-ET.SubElement(root, "string", name="SplashScreenProgressBarColor", value="00FFFFFF")
-ET.indent(tree, space="    ")
-fd, tmp = tempfile.mkstemp(prefix=".es_settings.", dir=os.path.dirname(path))
+# Unwrap configurations written by earlier Astra Retro OS builds.
+legacy = len(root) == 1 and root[0].tag == 'config'
+if legacy:
+    unwrapped = re.sub(r'^\s*<config\b[^>]*>', '', body, count=1, flags=re.I)
+    unwrapped = re.sub(r'</config>\s*$', '', unwrapped, count=1, flags=re.I)
+    if unwrapped == body or '<config' in unwrapped:
+        print('Warning: cannot unwrap legacy ES-DE settings safely', file=sys.stderr)
+        sys.exit(0)
+    body = unwrapped.strip() + '\n'
+    root = ET.fromstring('<astra-settings>' + body + '</astra-settings>')
+
+nodes = [element for element in root if element.tag == 'string' and
+         element.get('name') == 'SplashScreenProgressBarColor']
+if len(nodes) > 1:
+    print('Warning: duplicate ES-DE progress settings; preserving file', file=sys.stderr)
+    sys.exit(0)
+
+if nodes:
+    previous = nodes[0].get('value', '')
+    if previous.upper() not in ('', '79010FFF', cyan):
+        # Respect user customization; migration still removes the invalid root.
+        if not legacy:
+            sys.exit(0)
+    if previous.upper() in ('', '79010FFF'):
+        pattern = re.compile(
+            r'<string\b(?=[^>]*\bname\s*=\s*[\'\"]SplashScreenProgressBarColor[\'\"])[^>]*?/>',
+            re.S)
+        matches = list(pattern.finditer(body))
+        if len(matches) != 1:
+            print('Warning: cannot safely edit ES-DE progress setting', file=sys.stderr)
+            sys.exit(0)
+        tag = matches[0].group(0)
+        value_attr = re.compile(r'(\bvalue\s*=\s*)([\'\"])[^\'\"]*\2')
+        if value_attr.search(tag):
+            replacement = value_attr.sub(
+                lambda match: match.group(1) + match.group(2) + cyan + match.group(2),
+                tag, count=1)
+        else:
+            replacement = tag[:-2] + f' value="{cyan}" />'
+        body = body[:matches[0].start()] + replacement + body[matches[0].end():]
+else:
+    if body and not body.endswith('\n'):
+        body += '\n'
+    body += f'<string name="SplashScreenProgressBarColor" value="{cyan}" />\n'
+
+new_text = ((header.group(0).strip() + '\n') if header else '') + body
+if not legacy and new_text == original:
+    sys.exit(0)
+fd, temp = tempfile.mkstemp(prefix='.es_settings.', dir=os.path.dirname(path))
 try:
-    with os.fdopen(fd, "wb") as handle:
-        tree.write(handle, encoding="utf-8", xml_declaration=True)
-    os.chmod(tmp, 0o644)
-    os.replace(tmp, path)
+    with os.fdopen(fd, 'w', encoding='utf-8') as file:
+        file.write(new_text)
+    os.chmod(temp, (os.stat(path).st_mode & 0o777) if os.path.exists(path) else 0o644)
+    os.replace(temp, path)
 finally:
-    if os.path.exists(tmp):
-        os.unlink(tmp)
+    if os.path.exists(temp):
+        os.unlink(temp)
 PY_ESDE_SETTINGS
