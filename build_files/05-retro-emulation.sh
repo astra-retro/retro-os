@@ -29,4 +29,9 @@ mkdir -p /usr/lib/systemd/user/default.target.wants
 ln -sfn ../retro-emulation-setup.service \
     /usr/lib/systemd/user/default.target.wants/retro-emulation-setup.service
 
+# Additional portable utilities, pinned to upstream releases and verified
+# against their published SHA-256 checksums before being staged in /usr.
+# Build-time installation only: no network fetch on the installed system.
+bash /ctx/tools/install-retro-utilities.sh
+
 # Fedora Atomic /etc is mutable; do not persist user config in the build image.

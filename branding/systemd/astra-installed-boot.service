@@ -5,6 +5,9 @@ RequiresMountsFor=/boot
 ConditionPathExists=/boot/grub2/grub.cfg
 
 [Service]
+# Fedora bootc often presents /boot read-only. Allow the sync script to
+# remount it temporarily without changing the host mount namespace.
+PrivateMounts=yes
 Type=oneshot
 ExecStart=/usr/libexec/astra-retro-os/sync-installed-boot
 

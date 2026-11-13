@@ -10,9 +10,17 @@ The GRUB disk contents are synchronized separately.
 ## Installed GRUB
 
 - `astra-installed-boot.service` copies the existing GRUB image and EFI
-  modules to `/boot/grub2`, then writes a managed fragment into
-  `/boot/grub2/user.cfg` (bootupd static GRUB) or `custom.cfg`
-  (legacy Fedora GRUB). Existing custom lines are kept.
+  modules to `/boot/grub2`, then writes a managed fragment into the
+  **early** `console.cfg` hook (preferred for modern bootupd static GRUB),
+  or a sourced `user.cfg` / `custom.cfg` hook on older layouts.
+  Modern bootupd loads `console.cfg` **before** `blscfg`, whereas
+  `custom.cfg` is processed afterwards. Existing user lines are preserved,
+  and old Astra-managed sections are migrated to the early hook to avoid
+  duplicate execution. Inline `source` directives are supported;
+  commented-out directives are ignored. Unsupported layouts fail loudly.
+- GRUB loads the `sleep` module while `$prefix` points to the staged
+  `/boot/grub2` modules. Restoring the EFI `/EFI/fedora` prefix before
+  loading `sleep.mod` can break the graphical wait on installed systems.
 - The installed graphical splash uses the same five-second
   `sleep --interruptible` mechanism as the Live ISO, keeping the GRUB
   background visible. Press **Escape** during the delay to display the menu
@@ -20,10 +28,29 @@ The GRUB disk contents are synchronized separately.
   a menu. Recovery/one-shot requests show a regular ten-second menu.
   When `sleep` or the background is unavailable the script falls back to a
   visible timed menu, so boot selection remains possible.
-- Normal BLS/OSTree boot entries are kept unchanged, including their default
-  selection and rollback semantics. A low-sorting generated BLS entry
-  `0000-astra-retro-debug-0.conf` starts the active/staged deployment with
-  Plymouth disabled and verbose logging.
+- Normal BLS/OSTree boot entries and rollback behavior remain untouched.
+  The Debug variant now uses the **same filename stem as its normal BLS**
+  entry with a `~astra-debug.conf` suffix, for example
+  `bootc_fedora-45.20261111.0-1~astra-debug.conf`. Fedora's blscfg
+  uses RPM version ordering of **filenames**: the previous
+  `0000-astra-retro-debug-0.conf` file was ranked first despite its
+  `version 0` and absence of `sort-key`. The `~` suffix sorts its debug
+  variant after the normal entry. Synchronisation removes the old
+  `0000-astra-retro-debug-0.conf` and stale `~astra-debug.conf` variants;
+  it keeps the normal bootc BLS entries unchanged. If the obsolete Debug
+  entry was explicitly saved in `grubenv`, only that exact bad reference
+  is cleared, leaving other bootc saved/next entries untouched. Debug
+  continues to disable Plymouth and enables verbose logging when selected
+  manually.
+- Fedora bootc can mount `/boot` read-only during normal operation. The
+  synchronisation temporarily remounts only the **separate /boot mountpoint**
+  read-write, writes artwork/modules/GRUB fragment/BLS debug entry, then
+  restores read-only on every exit path. The systemd oneshot runs with
+  `PrivateMounts=yes`, so the remount does not alter the host's mount
+  namespace. It refuses to remount a parent filesystem if `/boot` is not
+  independently mounted, and fails loudly if read-only cannot be restored.
+  This addresses the `install: cannot change permissions of /boot/grub2:
+  Read-only file system` failure observed after the stable ISO install.
 - `astra-installed-boot.path` resynchronises the debug entry after changes to
   BLS files. The oneshot service also runs after boot.
 - The Live installer invokes the same command best-effort during its post
@@ -32,14 +59,74 @@ The GRUB disk contents are synchronized separately.
 No `grub2-install`, `grub2-mkconfig`, edits to the UEFI shim/GRUB stub
 or changes to `saved_entry` are performed.
 
+### GRUB lexer regression (PR #11)
+
+On the installed Fedora 45 machine, `grub2-script-check
+/boot/grub2/console.cfg` failed at line 46. The original generator used
+a shell-style `if [ ... ] || [ ... ]; then` expression, which GRUB's lexer
+rejected. The installed graphical hook now uses separate `if` commands
+to compute `astra_force_menu` without `||`.
+
+The sync script **refuses to replace** the selected hook unless
+`grub2-script-check` (or `grub-script-check`) approves the *complete*
+generated script. The build workflows also run
+`branding/tests/test-grub-lexer.sh` with the real GRUB checker before
+publishing an OCI image. Shell lint/tests alone are insufficient because
+GRUB syntax is not Bash syntax.
+
+This fixes the confirmed lexer error; it does **not** prove that GRUB
+graphics modules can be loaded under Secure Boot. Verify that separately
+on the physical machine after the syntax error disappears.
+
+### Secure Boot graphical fallback
+
+On the user's UEFI machine, the **same** installed GRUB image appears when
+Secure Boot is disabled, and is absent with `shim_lock=y`. This strongly
+isolates the issue to signed-GRUB policy rather than `$root`, `$prefix`,
+or the PNG itself. An external `.mod` being present on disk does not make
+it trusted under shim lockdown.
+
+The installed fragment therefore **does not invoke `insmod`** with
+`shim_lock=y` / `lockdown=y`. It tries only commands already embedded
+in Fedora's signed GRUB, and switches to the graphical terminal only
+after a Unicode font loads. Without a font it preserves the usable
+text terminal instead of drawing borders using question marks. Without
+`background_image` built into the signed GRUB, a background image is
+**not possible through external unsigned modules** while preserving
+Secure Boot; it will boot without the background.
+
+For a reliably branded GRUB under Secure Boot, integrate the required
+`gfxterm_background` / PNG / font capabilities into an appropriately
+signed and trusted EFI GRUB image, subject to Fedora shim lockdown
+restrictions. This is intentionally **not** done in this PR: changing
+the signed boot chain requires a separate tested signing strategy.
+Do not disable Secure Boot just to work around missing artwork.
+
 ### Local validation
 
 ```bash
+bash branding/tests/test-grub-lexer.sh
 bash branding/tests/test-installed-boot.sh
 sudo systemctl status astra-installed-boot.service astra-installed-boot.path
-sudo cat /boot/grub2/user.cfg
-sudo cat /boot/loader/entries/0000-astra-retro-debug-0.conf
+sudo grep -nE 'source.*(console|user|custom)\\.cfg' /boot/grub2/grub.cfg
+sudo ls -l /boot/grub2/{console,user,custom}.cfg /boot/grub2/astra-background.png
+sudo grep -n 'ASTRA RETRO OS INSTALLED BRANDING' /boot/grub2/{console,user,custom}.cfg 2>/dev/null
+sudo ls -l /boot/grub2/x86_64-efi/{gfxterm,gfxterm_background,png,sleep}.mod
+sudo journalctl -b -u astra-installed-boot.service --no-pager
+findmnt -T /boot/grub2 -o TARGET,SOURCE,VFS-OPTIONS
+sudo ls -l /boot/loader/entries/*~astra-debug.conf
+sudo grub2-editenv /boot/grub2/grubenv list
 ```
+
+If the background is still missing on a freshly updated bootc system,
+first identify the **actual GRUB files on disk**, not only the OCI image.
+Use `sudo systemctl restart astra-installed-boot.service` and check the
+journal before rebooting. A visible unthemed menu means either the sourced
+fragment was not executed, the artwork/modules could not be loaded by GRUB,
+or the firmware/Secure Boot configuration rejected external modules. A
+successful systemd service only confirms that files were written: it does
+**not** prove that signed GRUB rendered the background. Validate graphically
+on real UEFI and Secure Boot machines before declaring this regression fixed.
 
 The test covers first installation, idempotency, GRUB user customisations,
 updated BLS entries, and an unknown GRUB layout. A real UEFI/Secure Boot

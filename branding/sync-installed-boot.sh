@@ -12,22 +12,86 @@ asset="$(at /usr/share/astra-retro-os/grub-background.png)"
 grubdir="$(at /boot/grub2)"
 grubcfg="$grubdir/grub.cfg"
 entries="$(at /boot/loader/entries)"
-[[ -s "$asset" ]] || { log 'GRUB artwork not found; skipping'; exit 0; }
-[[ -s "$grubcfg" ]] || { log 'No installed GRUB config; skipping (another bootloader?)'; exit 0; }
+[[ -s "$asset" ]] || { log 'ERROR: installed GRUB artwork missing from OCI image'; exit 1; }
+[[ -s "$grubcfg" ]] || { log 'ERROR: /boot/grub2/grub.cfg is missing or empty'; exit 1; }
 
-# Fedora/bootupd uses user.cfg before blscfg; older GRUB generated configs
-# include custom.cfg. Modify only the supported extension point.
+# Modern bootupd static GRUB sources console.cfg BEFORE blscfg, and custom.cfg
+# AFTER blscfg. Initialise the graphics in the early console.cfg hook, while
+# preserving legacy user.cfg/custom.cfg fallback layouts. Doing this after
+# blscfg is less reliable on signed EFI GRUB builds.
+# Recognise inline source directives and ignore commented-out ones.
+# Never rewrite bootupd's grub.cfg or its signed EFI stub.
+grub_sources="$(sed -e '/^[[:space:]]*#/d' -e 's/[[:space:]]#.*$//' "$grubcfg")"
 config=''
-if grep -Eq '^[[:space:]]*source[[:space:]].*user\.cfg' "$grubcfg"; then
+if grep -Eq '(^|[[:space:];])source[[:space:]]+[^[:space:];#]*console\.cfg' <<< "$grub_sources"; then
+  config="$grubdir/console.cfg"
+elif grep -Eq '(^|[[:space:];])source[[:space:]]+[^[:space:];#]*user\.cfg' <<< "$grub_sources"; then
   config="$grubdir/user.cfg"
-elif grep -Eq '^[[:space:]]*source[[:space:]].*custom\.cfg' "$grubcfg"; then
+elif grep -Eq '(^|[[:space:];])source[[:space:]]+[^[:space:];#]*custom\.cfg' <<< "$grub_sources"; then
   config="$grubdir/custom.cfg"
 else
-  log 'No user.cfg/custom.cfg source in grub.cfg; leaving GRUB unchanged'
-  exit 0
+  log 'ERROR: no sourced console.cfg/user.cfg/custom.cfg in /boot/grub2/grub.cfg; cannot safely install branding'
+  exit 1
 fi
+log "Selected GRUB hook: ${config#"$root"}"
 
-install -d "$grubdir" "$entries"
+# Fedora Atomic/bootc deliberately mounts /boot read-only after boot. The
+# systemd service runs in its own mount namespace; temporarily remount /boot
+# writable only for this synchronisation, then restore read-only on *every*
+# exit path. In Anaconda's %post (ASTRA_ROOT) restore the installer mount too.
+# Refuse to remount '/' or another parent filesystem when /boot is not an
+# independent mountpoint: that could change the host OS unexpectedly.
+boot_mount="$(at /boot)"
+boot_remounted=0
+tmp=''
+tmp_bls=''
+cleanup() {
+  local status=$?
+  trap - EXIT
+  [[ -z "$tmp" ]] || rm -f "$tmp" || true
+  [[ -z "$tmp_bls" ]] || rm -f "$tmp_bls" || true
+  if [[ "$boot_remounted" == 1 ]]; then
+    if ! mount --options-source=disable -o remount,ro "$boot_mount"; then
+      log "ERROR: unable to restore read-only $boot_mount"
+      status=1
+    else
+      log "Restored read-only $boot_mount"
+    fi
+  fi
+  exit "$status"
+}
+trap cleanup EXIT
+
+boot_vfs_options="$(findmnt -n -o VFS-OPTIONS -T "$grubdir")" || {
+  log "ERROR: unable to inspect $grubdir mount options"
+  exit 1
+}
+case ",$boot_vfs_options," in
+  *,ro,*)
+    if ! mountpoint -q "$boot_mount"; then
+      log "ERROR: $boot_mount is not a separate mountpoint; refusing to remount its parent"
+      exit 1
+    fi
+    log "Temporarily remounting read-only $boot_mount writable"
+    mount --options-source=disable -o remount,rw "$boot_mount" || {
+      log "ERROR: failed to remount $boot_mount writable"
+      exit 1
+    }
+    boot_remounted=1
+    boot_vfs_options="$(findmnt -n -o VFS-OPTIONS -T "$grubdir")" || exit 1
+    case ",$boot_vfs_options," in
+      *,ro,*)
+        log "ERROR: $boot_mount is still read-only after remount"
+        exit 1
+        ;;
+    esac
+    ;;
+esac
+
+# mkdir -p leaves existing directory permissions unchanged. 'install -d'
+# tries to chmod existing directories, which failed immediately on read-only
+# Fedora Atomic /boot mounts even when the directory already existed.
+mkdir -p "$grubdir" "$entries"
 if ! cmp -s "$asset" "$grubdir/astra-background.png"; then
   install -m 0644 "$asset" "$grubdir/astra-background.png"
 fi
@@ -55,8 +119,21 @@ done
 # Only replace our managed section, keeping user-managed GRUB settings.
 start='# BEGIN ASTRA RETRO OS INSTALLED BRANDING'
 end='# END ASTRA RETRO OS INSTALLED BRANDING'
+
+# On upgrade a previous image may have written the branding into custom.cfg.
+# If we now use console.cfg, the old block MUST be removed or it will be run
+# a second time after blscfg, undoing the early graphical setup. Never delete
+# user-authored lines, and fail on damaged markers rather than corrupting them.
+for candidate in "$grubdir/console.cfg" "$grubdir/user.cfg" "$grubdir/custom.cfg"; do
+  [[ -f "$candidate" ]] || continue
+  begin_count="$(grep -Fxc "$start" "$candidate" || true)"
+  end_count="$(grep -Fxc "$end" "$candidate" || true)"
+  if [[ "$begin_count" != "$end_count" || "$begin_count" -gt 1 ]]; then
+    log "ERROR: incomplete or repeated Astra markers in $candidate"
+    exit 1
+  fi
+done
 tmp="$(mktemp "$grubdir/.astra-grub.XXXXXX")"
-trap 'rm -f "$tmp"' EXIT
 if [[ -f "$config" ]]; then
   awk -v start="$start" -v end="$end" '
     $0 == start {skip=1; next}
@@ -68,6 +145,7 @@ cat >> "$tmp" <<'GRUB'
 # BEGIN ASTRA RETRO OS INSTALLED BRANDING
 # GRUB root may refer to /boot or to the root filesystem.
 set astra_background_ok=0
+set astra_sleep_available=0
 set astra_boot_prefix=
 if search --no-floppy --file --set=astra_boot /grub2/astra-background.png; then
     set astra_boot_prefix="($astra_boot)/grub2"
@@ -77,20 +155,50 @@ fi
 if [ -n "$astra_boot_prefix" ]; then
     set astra_previous_prefix=$prefix
     set prefix=$astra_boot_prefix
-    insmod all_video
-    insmod gfxterm
-    insmod gfxterm_background
-    insmod png
-    if [ -f "$astra_boot_prefix/fonts/unicode.pf2" ]; then
-        loadfont "$astra_boot_prefix/fonts/unicode.pf2"
+    # shim_lock forbids loading unsigned modules from the /boot filesystem.
+    # Fedora's signed GRUB may already contain the display commands: use
+    # those built-ins directly in Secure Boot mode, never external insmod.
+    set astra_secure_boot=0
+    if [ "${shim_lock}" = y ]; then
+        set astra_secure_boot=1
     fi
-    set gfxmode=1920x1080,1600x900,1366x768,1280x720,auto
-    terminal_output gfxterm
-    set gfxpayload=keep
-    set menu_color_normal=white/black
-    set menu_color_highlight=black/light-cyan
-    if background_image -m stretch "$astra_boot_prefix/astra-background.png"; then
-        set astra_background_ok=1
+    if [ "${lockdown}" = y ]; then
+        set astra_secure_boot=1
+    fi
+    if [ "${astra_secure_boot}" = 0 ]; then
+        insmod all_video
+        insmod gfxterm
+        insmod gfxterm_background
+        insmod png
+    fi
+    # gfxterm without an available font displays '?' instead of the menu
+    # frame glyphs. Never switch to gfxterm unless a Unicode font loads.
+    set astra_font_ok=0
+    if loadfont unicode; then
+        set astra_font_ok=1
+    elif [ -f "$astra_boot_prefix/fonts/unicode.pf2" ]; then
+        if loadfont "$astra_boot_prefix/fonts/unicode.pf2"; then
+            set astra_font_ok=1
+        fi
+    fi
+    if [ "${astra_font_ok}" = 1 ]; then
+        set gfxmode=1920x1080,1600x900,1366x768,1280x720,auto
+        if terminal_output gfxterm; then
+            set gfxpayload=keep
+            set menu_color_normal=white/black
+            set menu_color_highlight=black/light-cyan
+            if background_image -m stretch "$astra_boot_prefix/astra-background.png"; then
+                set astra_background_ok=1
+            fi
+        fi
+    fi
+    # The original EFI prefix may be /EFI/fedora (without sleep.mod).
+    # The sleep module is attempted only when shim_lock is off; it is not
+    # necessarily embedded in the signed Fedora GRUB image.
+    if [ "${astra_secure_boot}" = 0 ]; then
+        if insmod sleep; then
+            set astra_sleep_available=1
+        fi
     fi
     set prefix=$astra_previous_prefix
 fi
@@ -104,11 +212,21 @@ fi
 # systems. The sleep happens while the GRUB config is being read; the final
 # menu timeout takes effect once blscfg has populated the BLS entries.
 set timeout_style=menu
-if [ "${menu_show_once}" = 1 ] || [ "${boot_success}" = 0 ]; then
+# GRUB's script lexer cannot parse the shell-style '||' expression that
+# previously appeared here and failed grub2-script-check at console.cfg:46.
+# Compute the OR using simple GRUB commands instead.
+set astra_force_menu=0
+if [ "${menu_show_once}" = 1 ]; then
+    set astra_force_menu=1
+fi
+if [ "${boot_success}" = 0 ]; then
+    set astra_force_menu=1
+fi
+if [ "${astra_force_menu}" = 1 ]; then
     # Recovery and explicit one-shot menu requests should not be hidden.
     set timeout=10
 elif [ "${astra_background_ok}" = 1 ]; then
-    if insmod sleep; then
+    if [ "${astra_sleep_available}" = 1 ]; then
         if sleep --interruptible 5; then
             # 5 seconds with no key: boot the normal default immediately.
             set timeout=0
@@ -126,20 +244,64 @@ else
 fi
 # END ASTRA RETRO OS INSTALLED BRANDING
 GRUB
+# Check the *generated* fragment with GRUB's own parser before replacing any
+# boot configuration. Fedora uses grub2-script-check; Debian uses grub-script-check.
+# If the checker is unavailable, fail closed instead of shipping unparsed GRUB.
+grub_checker=''
+if command -v grub2-script-check >/dev/null 2>&1; then
+  grub_checker=grub2-script-check
+elif command -v grub-script-check >/dev/null 2>&1; then
+  grub_checker=grub-script-check
+fi
+if [[ -z "$grub_checker" ]]; then
+  log 'ERROR: no GRUB script checker available; refusing to install unvalidated configuration'
+  exit 1
+fi
+if ! "$grub_checker" "$tmp"; then
+  log 'ERROR: generated GRUB syntax invalid; existing configuration preserved'
+  exit 1
+fi
 if ! cmp -s "$tmp" "$config"; then
   chmod 0644 "$tmp"
   mv -f "$tmp" "$config"
 fi
 
-# Copy the newest normal BLS entry (which can refer to a staged deployment).
-# GRUB sorts BLS filenames in reverse lexical/version order; 0000-... sorts
-# below Fedora's ostree-/bootc_ and hexadecimal machine-id names.
-debug="$entries/0000-astra-retro-debug-0.conf"
+# Migrate previous managed sections out of other hooks. Keep every non-Astra
+# directive, including user customizations, unchanged.
+for oldconfig in "$grubdir/console.cfg" "$grubdir/user.cfg" "$grubdir/custom.cfg"; do
+  [[ "$oldconfig" != "$config" && -f "$oldconfig" ]] || continue
+  grep -Fxq "$start" "$oldconfig" || continue
+  oldtmp="$(mktemp "$grubdir/.astra-legacy.XXXXXX")"
+  awk -v start="$start" -v end="$end" '
+    $0 == start {skip=1; next}
+    $0 == end {skip=0; next}
+    !skip {print}
+  ' "$oldconfig" > "$oldtmp"
+  chmod --reference="$oldconfig" "$oldtmp"
+  if ! cmp -s "$oldtmp" "$oldconfig"; then
+    mv -f "$oldtmp" "$oldconfig"
+  else
+    rm -f "$oldtmp"
+  fi
+done
+
+# Copy an existing normal bootc BLS entry, but NEVER add a standalone
+# 0000-... debug entry: Fedora's blscfg orders BLS FILENAMES with rpmvercmp,
+# where a numeric leading component can outrank alphabetic bootc/ostree
+# names. 'version 0' and removing 'sort-key' do not fix that ordering.
+#
+# Fedora uses a '~debug' suffix to keep debug kernels behind their parent.
+# Appending '~astra-debug' to the selected normal BLS filename does the same:
+# its parent entry will sort before the debug variant. It also continues to
+# work when bootc replaces the normal BLS filenames on upgrade/rollback.
 source_bls=''
 if [[ -d "$entries" ]]; then
   while IFS= read -r candidate; do
-    [[ "$candidate" != "$debug" ]] || continue
-    if grep -Eq '^linux[[:space:]]+' "$candidate" && grep -Eq '^options[[:space:]]+' "$candidate"; then
+    case "${candidate##*/}" in
+      0000-astra-retro-debug-0.conf|*~astra-debug.conf) continue ;;
+    esac
+    if grep -Eq '^linux[[:space:]]+' "$candidate" &&
+       grep -Eq '^options[[:space:]]+' "$candidate"; then
       source_bls="$candidate"
       break
     fi
@@ -147,16 +309,19 @@ if [[ -d "$entries" ]]; then
 fi
 [[ -n "$source_bls" ]] || { log 'No normal BLS entry yet; debug entry deferred'; exit 0; }
 
+source_base="${source_bls##*/}"
+source_stem="${source_base%.conf}"
+debug="$entries/${source_stem}~astra-debug.conf"
+
 tmp_bls="$(mktemp "$entries/.astra-debug.XXXXXX")"
-trap 'rm -f "$tmp" "$tmp_bls"' EXIT
 awk '
-  BEGIN {has_title=0; has_sort=0; has_options=0}
+  BEGIN {has_title=0; has_version=0; has_options=0}
   /^title[[:space:]]/ {
     print "title Astra Retro OS (Debug)"; has_title=1; next
   }
-  /^sort-key[[:space:]]/ {
-    print "sort-key zz-astra-retro-debug"; has_sort=1; next
-  }
+  # Never promote Debug with a separate sort-key.
+  /^sort-key[[:space:]]/ {next}
+  /^version[[:space:]]/ {print "version 0"; has_version=1; next}
   /^options[[:space:]]/ {
     out="options"
     for (i=2; i<=NF; i++) {
@@ -169,7 +334,7 @@ awk '
   {print}
   END {
     if (!has_title) print "title Astra Retro OS (Debug)"
-    if (!has_sort) print "sort-key zz-astra-retro-debug"
+    if (!has_version) print "version 0"
     if (!has_options) exit 2
   }
 ' "$source_bls" > "$tmp_bls"
@@ -177,4 +342,32 @@ if ! cmp -s "$tmp_bls" "$debug"; then
   chmod 0644 "$tmp_bls"
   mv -f "$tmp_bls" "$debug"
 fi
-log 'Installed GRUB artwork, hidden menu and BLS debug entry synchronised'
+
+# Remove only Astra-generated stale entries, including the old 0000-... file
+# that was incorrectly ranked first. Never touch normal bootc BLS entries.
+for stale in "$entries/0000-astra-retro-debug-0.conf" "$entries/"*~astra-debug.conf; do
+  [[ -f "$stale" && "$stale" != "$debug" ]] || continue
+  # Exact legacy filename belongs to Astra. Other matching files must also
+  # carry our title before they can be removed.
+  if [[ "${stale##*/}" == 0000-astra-retro-debug-0.conf ]] ||
+     grep -Fxq 'title Astra Retro OS (Debug)' "$stale"; then
+    rm -f -- "$stale"
+  fi
+done
+
+# If an earlier build explicitly saved the old Debug BLS ID as GRUB's
+# default, clear only that bad reference. Preserve every other bootc default.
+grubenv="$grubdir/grubenv"
+if [[ -f "$grubenv" ]] && command -v grub2-editenv >/dev/null 2>&1; then
+  env_contents="$(grub2-editenv "$grubenv" list)" || exit 1
+  for key in saved_entry next_entry; do
+    value="$(printf '%s\n' "$env_contents" | sed -n "s/^$key=//p" | head -n 1)"
+    case "$value" in
+      0000-astra-retro-debug-0|0000-astra-retro-debug-0.conf|*~astra-debug|*~astra-debug.conf)
+        grub2-editenv "$grubenv" unset "$key"
+        log "Cleared legacy Astra Debug $key from GRUB environment"
+        ;;
+    esac
+  done
+fi
+log "Installed GRUB artwork and non-default BLS debug entry synchronised via ${config#"$root"}"
