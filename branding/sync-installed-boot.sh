@@ -15,21 +15,25 @@ entries="$(at /boot/loader/entries)"
 [[ -s "$asset" ]] || { log 'ERROR: installed GRUB artwork missing from OCI image'; exit 1; }
 [[ -s "$grubcfg" ]] || { log 'ERROR: /boot/grub2/grub.cfg is missing or empty'; exit 1; }
 
-# bootupd static configurations load user.cfg (older) or custom.cfg (newer).
-# Some Fedora GRUB configurations put "source" on the same line as "if".
-# Recognise either form and ignore comments, rather than silently skipping
-# installation when the literal source directive is not at column zero.
-# Never rewrite bootupd's /boot/grub2/grub.cfg or the signed EFI stub.
+# Modern bootupd static GRUB sources console.cfg BEFORE blscfg, and custom.cfg
+# AFTER blscfg. Initialise the graphics in the early console.cfg hook, while
+# preserving legacy user.cfg/custom.cfg fallback layouts. Doing this after
+# blscfg is less reliable on signed EFI GRUB builds.
+# Recognise inline source directives and ignore commented-out ones.
+# Never rewrite bootupd's grub.cfg or its signed EFI stub.
 grub_sources="$(sed -e '/^[[:space:]]*#/d' -e 's/[[:space:]]#.*$//' "$grubcfg")"
 config=''
-if grep -Eq '(^|[[:space:];])source[[:space:]]+[^[:space:];#]*user\.cfg' <<< "$grub_sources"; then
+if grep -Eq '(^|[[:space:];])source[[:space:]]+[^[:space:];#]*console\.cfg' <<< "$grub_sources"; then
+  config="$grubdir/console.cfg"
+elif grep -Eq '(^|[[:space:];])source[[:space:]]+[^[:space:];#]*user\.cfg' <<< "$grub_sources"; then
   config="$grubdir/user.cfg"
 elif grep -Eq '(^|[[:space:];])source[[:space:]]+[^[:space:];#]*custom\.cfg' <<< "$grub_sources"; then
   config="$grubdir/custom.cfg"
 else
-  log 'ERROR: no sourced user.cfg/custom.cfg in /boot/grub2/grub.cfg; cannot safely install branding'
+  log 'ERROR: no sourced console.cfg/user.cfg/custom.cfg in /boot/grub2/grub.cfg; cannot safely install branding'
   exit 1
 fi
+log "Selected GRUB hook: ${config#"$root"}"
 
 install -d "$grubdir" "$entries"
 if ! cmp -s "$asset" "$grubdir/astra-background.png"; then
@@ -59,6 +63,20 @@ done
 # Only replace our managed section, keeping user-managed GRUB settings.
 start='# BEGIN ASTRA RETRO OS INSTALLED BRANDING'
 end='# END ASTRA RETRO OS INSTALLED BRANDING'
+
+# On upgrade a previous image may have written the branding into custom.cfg.
+# If we now use console.cfg, the old block MUST be removed or it will be run
+# a second time after blscfg, undoing the early graphical setup. Never delete
+# user-authored lines, and fail on damaged markers rather than corrupting them.
+for candidate in "$grubdir/console.cfg" "$grubdir/user.cfg" "$grubdir/custom.cfg"; do
+  [[ -f "$candidate" ]] || continue
+  begin_count="$(grep -Fxc "$start" "$candidate" || true)"
+  end_count="$(grep -Fxc "$end" "$candidate" || true)"
+  if [[ "$begin_count" != "$end_count" || "$begin_count" -gt 1 ]]; then
+    log "ERROR: incomplete or repeated Astra markers in $candidate"
+    exit 1
+  fi
+done
 tmp="$(mktemp "$grubdir/.astra-grub.XXXXXX")"
 trap 'rm -f "$tmp"' EXIT
 if [[ -f "$config" ]]; then
@@ -141,6 +159,25 @@ if ! cmp -s "$tmp" "$config"; then
   mv -f "$tmp" "$config"
 fi
 
+# Migrate previous managed sections out of other hooks. Keep every non-Astra
+# directive, including user customizations, unchanged.
+for oldconfig in "$grubdir/console.cfg" "$grubdir/user.cfg" "$grubdir/custom.cfg"; do
+  [[ "$oldconfig" != "$config" && -f "$oldconfig" ]] || continue
+  grep -Fxq "$start" "$oldconfig" || continue
+  oldtmp="$(mktemp "$grubdir/.astra-legacy.XXXXXX")"
+  awk -v start="$start" -v end="$end" '
+    $0 == start {skip=1; next}
+    $0 == end {skip=0; next}
+    !skip {print}
+  ' "$oldconfig" > "$oldtmp"
+  chmod --reference="$oldconfig" "$oldtmp"
+  if ! cmp -s "$oldtmp" "$oldconfig"; then
+    mv -f "$oldtmp" "$oldconfig"
+  else
+    rm -f "$oldtmp"
+  fi
+done
+
 # Copy the newest normal BLS entry (which can refer to a staged deployment).
 # GRUB sorts BLS filenames in reverse lexical/version order; 0000-... sorts
 # below Fedora's ostree-/bootc_ and hexadecimal machine-id names.
@@ -187,4 +224,4 @@ if ! cmp -s "$tmp_bls" "$debug"; then
   chmod 0644 "$tmp_bls"
   mv -f "$tmp_bls" "$debug"
 fi
-log 'Installed GRUB artwork, hidden menu and BLS debug entry synchronised'
+log "Installed GRUB artwork and BLS debug entry synchronised via ${config#"$root"}"
