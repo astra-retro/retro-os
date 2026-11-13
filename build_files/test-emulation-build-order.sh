@@ -50,4 +50,5 @@ for name in ('retro-emulation-setup', 'retro-fetch-esde', 'retro-launch-esde', '
 assert Path('system_files/retro-emulation/usr/lib/systemd/user/retro-emulation-setup.service').is_file()
 assert Path('system_files/retro-emulation/usr/share/retro-os/esde/splash.svg').is_file()
 PY
+bash build_files/test-skyscraper-appdir.sh
 echo 'Retro emulation install-order checks passed'
