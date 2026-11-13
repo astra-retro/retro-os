@@ -10,9 +10,15 @@ The GRUB disk contents are synchronized separately.
 ## Installed GRUB
 
 - `astra-installed-boot.service` copies the existing GRUB image and EFI
-  modules to `/boot/grub2`, then writes a managed fragment into
-  `/boot/grub2/user.cfg` (bootupd static GRUB) or `custom.cfg`
-  (legacy Fedora GRUB). Existing custom lines are kept.
+  modules to `/boot/grub2`, then writes a managed fragment into the
+  `user.cfg` or `custom.cfg` file **actually sourced** by the installed
+  `/boot/grub2/grub.cfg` (bootupd/Fedora variants). Existing custom lines
+  are kept. Both multiline and inline conditional `source` directives are
+  supported; commented-out directives are ignored. Missing/unsupported hooks
+  are reported as errors rather than silently skipping the wallpaper.
+- GRUB loads the `sleep` module while `$prefix` points to the staged
+  `/boot/grub2` modules. Restoring the EFI `/EFI/fedora` prefix before
+  loading `sleep.mod` can break the graphical wait on installed systems.
 - The installed graphical splash uses the same five-second
   `sleep --interruptible` mechanism as the Live ISO, keeping the GRUB
   background visible. Press **Escape** during the delay to display the menu
@@ -37,7 +43,9 @@ or changes to `saved_entry` are performed.
 ```bash
 bash branding/tests/test-installed-boot.sh
 sudo systemctl status astra-installed-boot.service astra-installed-boot.path
-sudo cat /boot/grub2/user.cfg
+sudo grep -nE 'source.*(user|custom)\\.cfg' /boot/grub2/grub.cfg
+sudo ls -l /boot/grub2/{user,custom}.cfg /boot/grub2/astra-background.png
+sudo journalctl -b -u astra-installed-boot.service --no-pager
 sudo cat /boot/loader/entries/0000-astra-retro-debug-0.conf
 ```
 
