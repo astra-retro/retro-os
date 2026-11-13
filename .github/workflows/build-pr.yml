@@ -105,6 +105,10 @@ jobs:
           set -euo pipefail
           bash .github/scripts/test-bootc-tracking.sh
           just check
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends grub-common
+          bash branding/tests/test-grub-lexer.sh
+          bash branding/tests/test-installed-boot.sh
           just build retro-os "$IMAGE_TAG"
           just ostree-rechunk retro-os "$IMAGE_TAG"
           mkdir -p dist
