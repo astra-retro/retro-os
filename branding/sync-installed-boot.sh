@@ -285,20 +285,23 @@ for oldconfig in "$grubdir/console.cfg" "$grubdir/user.cfg" "$grubdir/custom.cfg
   fi
 done
 
-# Copy the newest normal BLS entry (which can refer to a staged deployment).
-# The debug BLS entry MUST sort after every normal entry. Filename 0000-...
-# sorts last on Fedora's filename-based blscfg; new GRUB also sorts by the
-# optional "sort-key". NEVER give Debug a sort-key: an entry with sort-key
-# sorts ahead of an entry without it (and zz- was the cause of Debug booting
-# first). Use version 0 to place it behind normal versions with the same
-# machine-id even on versions of GRUB that sort by the BLS metadata.
-# Do not touch saved_entry/next_entry: bootc owns the default deployment.
-debug="$entries/0000-astra-retro-debug-0.conf"
+# Copy an existing normal bootc BLS entry, but NEVER add a standalone
+# 0000-... debug entry: Fedora's blscfg orders BLS FILENAMES with rpmvercmp,
+# where a numeric leading component can outrank alphabetic bootc/ostree
+# names. 'version 0' and removing 'sort-key' do not fix that ordering.
+#
+# Fedora uses a '~debug' suffix to keep debug kernels behind their parent.
+# Appending '~astra-debug' to the selected normal BLS filename does the same:
+# its parent entry will sort before the debug variant. It also continues to
+# work when bootc replaces the normal BLS filenames on upgrade/rollback.
 source_bls=''
 if [[ -d "$entries" ]]; then
   while IFS= read -r candidate; do
-    [[ "$candidate" != "$debug" ]] || continue
-    if grep -Eq '^linux[[:space:]]+' "$candidate" && grep -Eq '^options[[:space:]]+' "$candidate"; then
+    case "${candidate##*/}" in
+      0000-astra-retro-debug-0.conf|*~astra-debug.conf) continue ;;
+    esac
+    if grep -Eq '^linux[[:space:]]+' "$candidate" &&
+       grep -Eq '^options[[:space:]]+' "$candidate"; then
       source_bls="$candidate"
       break
     fi
@@ -306,14 +309,17 @@ if [[ -d "$entries" ]]; then
 fi
 [[ -n "$source_bls" ]] || { log 'No normal BLS entry yet; debug entry deferred'; exit 0; }
 
+source_base="${source_bls##*/}"
+source_stem="${source_base%.conf}"
+debug="$entries/${source_stem}~astra-debug.conf"
+
 tmp_bls="$(mktemp "$entries/.astra-debug.XXXXXX")"
 awk '
   BEGIN {has_title=0; has_version=0; has_options=0}
   /^title[[:space:]]/ {
     print "title Astra Retro OS (Debug)"; has_title=1; next
   }
-  # Never copy the source deployment sort-key: it makes Debug first when
-  # normal bootc BLS snippets do not define one.
+  # Never promote Debug with a separate sort-key.
   /^sort-key[[:space:]]/ {next}
   /^version[[:space:]]/ {print "version 0"; has_version=1; next}
   /^options[[:space:]]/ {
@@ -336,4 +342,32 @@ if ! cmp -s "$tmp_bls" "$debug"; then
   chmod 0644 "$tmp_bls"
   mv -f "$tmp_bls" "$debug"
 fi
-log "Installed GRUB artwork and BLS debug entry synchronised via ${config#"$root"}"
+
+# Remove only Astra-generated stale entries, including the old 0000-... file
+# that was incorrectly ranked first. Never touch normal bootc BLS entries.
+for stale in "$entries/0000-astra-retro-debug-0.conf" "$entries/"*~astra-debug.conf; do
+  [[ -f "$stale" && "$stale" != "$debug" ]] || continue
+  # Exact legacy filename belongs to Astra. Other matching files must also
+  # carry our title before they can be removed.
+  if [[ "${stale##*/}" == 0000-astra-retro-debug-0.conf ]] ||
+     grep -Fxq 'title Astra Retro OS (Debug)' "$stale"; then
+    rm -f -- "$stale"
+  fi
+done
+
+# If an earlier build explicitly saved the old Debug BLS ID as GRUB's
+# default, clear only that bad reference. Preserve every other bootc default.
+grubenv="$grubdir/grubenv"
+if [[ -f "$grubenv" ]] && command -v grub2-editenv >/dev/null 2>&1; then
+  env_contents="$(grub2-editenv "$grubenv" list)" || exit 1
+  for key in saved_entry next_entry; do
+    value="$(printf '%s\n' "$env_contents" | sed -n "s/^$key=//p" | head -n 1)"
+    case "$value" in
+      0000-astra-retro-debug-0|0000-astra-retro-debug-0.conf|*~astra-debug|*~astra-debug.conf)
+        grub2-editenv "$grubenv" unset "$key"
+        log "Cleared legacy Astra Debug $key from GRUB environment"
+        ;;
+    esac
+  done
+fi
+log "Installed GRUB artwork and non-default BLS debug entry synchronised via ${config#"$root"}"
