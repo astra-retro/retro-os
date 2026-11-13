@@ -32,6 +32,15 @@ The GRUB disk contents are synchronized separately.
   selection and rollback semantics. A low-sorting generated BLS entry
   `0000-astra-retro-debug-0.conf` starts the active/staged deployment with
   Plymouth disabled and verbose logging.
+- Fedora bootc can mount `/boot` read-only during normal operation. The
+  synchronisation temporarily remounts only the **separate /boot mountpoint**
+  read-write, writes artwork/modules/GRUB fragment/BLS debug entry, then
+  restores read-only on every exit path. The systemd oneshot runs with
+  `PrivateMounts=yes`, so the remount does not alter the host's mount
+  namespace. It refuses to remount a parent filesystem if `/boot` is not
+  independently mounted, and fails loudly if read-only cannot be restored.
+  This addresses the `install: cannot change permissions of /boot/grub2:
+  Read-only file system` failure observed after the stable ISO install.
 - `astra-installed-boot.path` resynchronises the debug entry after changes to
   BLS files. The oneshot service also runs after boot.
 - The Live installer invokes the same command best-effort during its post
@@ -50,6 +59,7 @@ sudo ls -l /boot/grub2/{console,user,custom}.cfg /boot/grub2/astra-background.pn
 sudo grep -n 'ASTRA RETRO OS INSTALLED BRANDING' /boot/grub2/{console,user,custom}.cfg 2>/dev/null
 sudo ls -l /boot/grub2/x86_64-efi/{gfxterm,gfxterm_background,png,sleep}.mod
 sudo journalctl -b -u astra-installed-boot.service --no-pager
+findmnt -T /boot/grub2 -o TARGET,SOURCE,VFS-OPTIONS
 sudo cat /boot/loader/entries/0000-astra-retro-debug-0.conf
 ```
 
