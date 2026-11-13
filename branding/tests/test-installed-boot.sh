@@ -16,7 +16,7 @@ mkdir -p "$tmp/checker"
 cat > "$tmp/checker/grub2-script-check" <<'CHECK'
 #!/usr/bin/env bash
 [[ "$#" == 1 && -s "$1" ]] || exit 1
-if grep -Eq '(^|[[:space:]])\\|\\|([[:space:]]|$)' "$1"; then
+if grep -Fq ' || ' "$1"; then
   echo "ERROR: shell || operator in GRUB script" >&2
   exit 1
 fi
