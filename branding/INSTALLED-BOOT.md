@@ -112,6 +112,34 @@ gsettings set org.gnome.shell.extensions.dash-to-dock autohide false
 gsettings set org.gnome.shell.extensions.dash-to-dock intellihide false
 ```
 
+## GDM login keyboard (French AZERTY)
+
+The Live ISO is explicitly configured for the French keyboard, but that
+Live-only configuration is not installed into the persistent bootc image.
+The logged-in GNOME user's AZERTY selection therefore does not guarantee
+an AZERTY layout at the GDM password prompt.
+
+The installed image now supplies an **unlocked** GDM dconf default at
+`/etc/dconf/db/gdm.d/30-astra-gdm-keyboard` with `fr` first and `us`
+available as a secondary layout. The system/user settings are not locked:
+a different deployment locale or keyboard choice can override the default.
+`branding/install-common.sh` runs `dconf update` at image build time.
+
+After deploying the corrected image and rebooting, verify the GDM dconf
+default with:
+
+```bash
+cat /etc/dconf/db/gdm.d/30-astra-gdm-keyboard
+DCONF_PROFILE=gdm gsettings get org.gnome.desktop.input-sources sources
+localectl status
+```
+
+The `gsettings` command invoked as root may show root's session/user
+settings rather than the live GDM session: validate the actual keyboard
+layout on the password prompt after reboot. GDM may also use system
+`localed` or per-user AccountsService input sources on some releases; a
+runtime UEFI login test is still necessary.
+
 ## First-boot language / timezone / user creation (GNOME Initial Setup)
 
 Before a user account exists, GNOME Initial Setup runs inside a **special GDM
