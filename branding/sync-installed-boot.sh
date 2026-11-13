@@ -187,7 +187,17 @@ fi
 # systems. The sleep happens while the GRUB config is being read; the final
 # menu timeout takes effect once blscfg has populated the BLS entries.
 set timeout_style=menu
-if [ "${menu_show_once}" = 1 ] || [ "${boot_success}" = 0 ]; then
+# GRUB's script lexer cannot parse the shell-style '||' expression that
+# previously appeared here and failed grub2-script-check at console.cfg:46.
+# Compute the OR using simple GRUB commands instead.
+set astra_force_menu=0
+if [ "${menu_show_once}" = 1 ]; then
+    set astra_force_menu=1
+fi
+if [ "${boot_success}" = 0 ]; then
+    set astra_force_menu=1
+fi
+if [ "${astra_force_menu}" = 1 ]; then
     # Recovery and explicit one-shot menu requests should not be hidden.
     set timeout=10
 elif [ "${astra_background_ok}" = 1 ]; then
@@ -209,6 +219,23 @@ else
 fi
 # END ASTRA RETRO OS INSTALLED BRANDING
 GRUB
+# Check the *generated* fragment with GRUB's own parser before replacing any
+# boot configuration. Fedora uses grub2-script-check; Debian uses grub-script-check.
+# If the checker is unavailable, fail closed instead of shipping unparsed GRUB.
+grub_checker=''
+if command -v grub2-script-check >/dev/null 2>&1; then
+  grub_checker=grub2-script-check
+elif command -v grub-script-check >/dev/null 2>&1; then
+  grub_checker=grub-script-check
+fi
+if [[ -z "$grub_checker" ]]; then
+  log 'ERROR: no GRUB script checker available; refusing to install unvalidated configuration'
+  exit 1
+fi
+if ! "$grub_checker" "$tmp"; then
+  log 'ERROR: generated GRUB syntax invalid; existing configuration preserved'
+  exit 1
+fi
 if ! cmp -s "$tmp" "$config"; then
   chmod 0644 "$tmp"
   mv -f "$tmp" "$config"
