@@ -19,6 +19,9 @@ jobs:
     name: Build and push image (main only)
     if: (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main') || (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v'))
     runs-on: ubuntu-26.04
+    outputs:
+      image_ref: ${{ steps.push-image.outputs.image_ref }}
+      tracking_ref: ${{ steps.push-image.outputs.tracking_ref }}
 
     permissions:
       contents: read
@@ -164,7 +167,12 @@ jobs:
 
           digest=$(< /tmp/digestfile)
 
-          echo "digest=${digest}" >> $GITHUB_OUTPUT
+          [[ "$digest" =~ ^sha256:[a-f0-9]{64}$ ]] || {
+            echo "::error::Invalid published OCI digest"; exit 1;
+          }
+          echo "digest=${digest}" >> "$GITHUB_OUTPUT"
+          echo "image_ref=${IMAGE_REGISTRY}/${IMAGE_NAME}@${digest}" >> "$GITHUB_OUTPUT"
+          echo "tracking_ref=${IMAGE_REGISTRY}/${IMAGE_NAME}:stable" >> "$GITHUB_OUTPUT"
 
       # This section is optional and only needs to be enabled if you plan on distributing
       # your project for others to consume. You will need to create a public and private key
@@ -189,3 +197,16 @@ jobs:
           # https://github.com/coreos/rpm-ostree/issues/5509
           # use old bundle format, so we can use newer cosign 3.X.X instead of 2.X.X
           cosign sign -y --new-bundle-format=false --use-signing-config=false --key env://COSIGN_PRIVATE_KEY ${IMAGE_REGISTRY}/${IMAGE_NAME}@${DIGEST}
+
+  release_iso:
+    name: Build release ISO (amd64)
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    needs: build_push
+    permissions:
+      contents: read
+      packages: read
+    uses: ./.github/workflows/build-live-iso.yml
+    with:
+      image_ref: ${{ needs.build_push.outputs.image_ref }}
+      tracking_ref: ${{ needs.build_push.outputs.tracking_ref }}
+      source_sha: ${{ github.sha }}

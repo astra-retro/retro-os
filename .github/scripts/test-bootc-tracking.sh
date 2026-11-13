@@ -24,6 +24,8 @@ iso = files[".github/workflows/build-live-iso.yml"]
 assert 'INSTALL_IMAGE_TRACKING_REF=$RETRO_TRACKING_REF' in iso
 assert 'printf \'payload=%s\\ntracking=%s\\n\'' in iso
 assert 'sudo podman pull "$payload"' in iso
+assert "github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')" in iso
+assert "retention-days: ${{ startsWith(github.ref, 'refs/tags/v') && 90 || 3 }}" in iso
 disk = files[".github/workflows/build-disk.yml"]
 assert 'sudo podman tag "$digest" "$TRACKING_REF"' in disk
 assert 'BOOTC_REF: ${{ steps.image.outputs.tracking_ref }}' in disk
@@ -43,5 +45,10 @@ assert "tags:\n      - 'v*'" in release
 assert 'git merge-base --is-ancestor HEAD origin/main' in release
 assert 'alias_tags+=" stable"' in release
 assert 'git fetch --no-tags origin main' in release
+assert 'uses: ./.github/workflows/build-live-iso.yml' in release
+assert 'image_ref: ${{ needs.build_push.outputs.image_ref }}' in release
+assert 'tracking_ref: ${{ needs.build_push.outputs.tracking_ref }}' in release
+assert 'source_sha: ${{ github.sha }}' in release
+assert 'image_ref=${IMAGE_REGISTRY}/${IMAGE_NAME}@${digest}' in release
 PY
 echo "Bootc channel workflow checks passed"
