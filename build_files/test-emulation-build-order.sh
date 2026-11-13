@@ -53,4 +53,11 @@ assert Path('system_files/retro-emulation/usr/lib/systemd/user/retro-emulation-s
 assert Path('system_files/retro-emulation/usr/share/retro-os/esde/splash.svg').is_file()
 PY
 bash build_files/test-skyscraper-appdir.sh
+# Regression for GitHub runners: ensure this test also resolves its helper
+# correctly when invoked from outside the repository working directory.
+repo_root="$PWD"
+(
+  cd /tmp
+  bash "$repo_root/build_files/test-skyscraper-appdir.sh"
+)
 echo 'Retro emulation install-order checks passed'
