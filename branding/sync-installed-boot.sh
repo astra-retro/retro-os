@@ -234,8 +234,13 @@ for oldconfig in "$grubdir/console.cfg" "$grubdir/user.cfg" "$grubdir/custom.cfg
 done
 
 # Copy the newest normal BLS entry (which can refer to a staged deployment).
-# GRUB sorts BLS filenames in reverse lexical/version order; 0000-... sorts
-# below Fedora's ostree-/bootc_ and hexadecimal machine-id names.
+# The debug BLS entry MUST sort after every normal entry. Filename 0000-...
+# sorts last on Fedora's filename-based blscfg; new GRUB also sorts by the
+# optional "sort-key". NEVER give Debug a sort-key: an entry with sort-key
+# sorts ahead of an entry without it (and zz- was the cause of Debug booting
+# first). Use version 0 to place it behind normal versions with the same
+# machine-id even on versions of GRUB that sort by the BLS metadata.
+# Do not touch saved_entry/next_entry: bootc owns the default deployment.
 debug="$entries/0000-astra-retro-debug-0.conf"
 source_bls=''
 if [[ -d "$entries" ]]; then
@@ -251,13 +256,14 @@ fi
 
 tmp_bls="$(mktemp "$entries/.astra-debug.XXXXXX")"
 awk '
-  BEGIN {has_title=0; has_sort=0; has_options=0}
+  BEGIN {has_title=0; has_version=0; has_options=0}
   /^title[[:space:]]/ {
     print "title Astra Retro OS (Debug)"; has_title=1; next
   }
-  /^sort-key[[:space:]]/ {
-    print "sort-key zz-astra-retro-debug"; has_sort=1; next
-  }
+  # Never copy the source deployment sort-key: it makes Debug first when
+  # normal bootc BLS snippets do not define one.
+  /^sort-key[[:space:]]/ {next}
+  /^version[[:space:]]/ {print "version 0"; has_version=1; next}
   /^options[[:space:]]/ {
     out="options"
     for (i=2; i<=NF; i++) {
@@ -270,7 +276,7 @@ awk '
   {print}
   END {
     if (!has_title) print "title Astra Retro OS (Debug)"
-    if (!has_sort) print "sort-key zz-astra-retro-debug"
+    if (!has_version) print "version 0"
     if (!has_options) exit 2
   }
 ' "$source_bls" > "$tmp_bls"
