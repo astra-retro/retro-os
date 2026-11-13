@@ -20,6 +20,15 @@ for cmd in ('/usr/bin/ps3dec', '/usr/bin/rusty-psn-cli', '/usr/bin/rusty-psn', '
     assert cmd in installer
 assert 'Skyscraper.AppDir/AppRun' in installer
 assert '--appimage-extract' in installer
+# Extracted AppImages must be copied without restrictive permissions or
+# temporary SELinux contexts, then verified as an unprivileged user.
+assert 'cp -a "$tmp/squashfs-root"' not in installer
+assert 'cp -R --no-preserve=mode,ownership,context' in installer
+assert 'chmod -R u+rwX,go+rX,go-w "$appdir"' in installer
+assert 'chmod 0755 "$appdir/AppRun"' in installer
+assert 'runuser -u nobody -- test -x "$appdir/AppRun"' in installer
+assert 'APPDIR=/usr/libexec/retro-os/Skyscraper.AppDir' in installer
+
 # Find predicate parentheses must be escaped exactly once in the shell.
 # A duplicate backslash caused the parser failure reported in CI.
 slash = chr(92)
