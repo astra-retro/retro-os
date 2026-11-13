@@ -70,7 +70,7 @@ install_rusty() {
     "$digest" "$tmp/$asset"
   mkdir -p "$dir"
   unzip -q "$tmp/$asset" -d "$dir"
-  mapfile -d '' -t binaries < <(find "$dir" -type f \\( -name rusty-psn -o -name rusty-psn-cli -o -name rusty-psn-egui \\) -print0)
+  mapfile -d '' -t binaries < <(find "$dir" -type f \( -name rusty-psn -o -name rusty-psn-cli -o -name rusty-psn-egui \) -print0)
   if (( ${#binaries[@]} != 1 )); then
     echo "ERROR: expected exactly one rusty-psn binary in $asset" >&2
     exit 1
