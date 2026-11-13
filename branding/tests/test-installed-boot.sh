@@ -67,6 +67,39 @@ ASTRA_ROOT="$root" "$script"
 grep -Fq 'ostree=/ostree/boot.1/astra/b/0' "$debug"
 ! grep -Fq 'ostree=/ostree/boot.1/astra/a/0' "$debug"
 
+# Simulate Fedora bootc's read-only /boot mount without requiring a
+# privileged runner. Mock only mount inspection and remount operations.
+mkdir -p "$tmp/mount-mocks"
+printf 'ro\n' > "$tmp/mount-state"
+: > "$tmp/remount-log"
+cat > "$tmp/mount-mocks/findmnt" <<'MOCK'
+#!/usr/bin/env bash
+cat "$ASTRA_MOUNT_STATE"
+MOCK
+cat > "$tmp/mount-mocks/mountpoint" <<'MOCK'
+#!/usr/bin/env bash
+[[ "$1" == "-q" && "$2" == "$ASTRA_EXPECTED_BOOT" ]]
+MOCK
+cat > "$tmp/mount-mocks/mount" <<'MOCK'
+#!/usr/bin/env bash
+[[ "$1" == "--options-source=disable" && "$2" == "-o" ]] || exit 1
+case "$3" in
+  remount,rw) printf 'rw\n' > "$ASTRA_MOUNT_STATE" ;;
+  remount,ro) printf 'ro\n' > "$ASTRA_MOUNT_STATE" ;;
+  *) exit 1 ;;
+esac
+printf '%s %s\n' "$3" "$4" >> "$ASTRA_REMOUNT_LOG"
+MOCK
+chmod +x "$tmp/mount-mocks/"*
+ASTRA_MOUNT_STATE="$tmp/mount-state" \
+ASTRA_REMOUNT_LOG="$tmp/remount-log" \
+ASTRA_EXPECTED_BOOT="$root/boot" \
+PATH="$tmp/mount-mocks:$PATH" ASTRA_ROOT="$root" "$script"
+[[ "$(cat "$tmp/mount-state")" == ro ]]
+[[ "$(wc -l < "$tmp/remount-log")" == 2 ]]
+grep -Fq "remount,rw $root/boot" "$tmp/remount-log"
+grep -Fq "remount,ro $root/boot" "$tmp/remount-log"
+
 # The sleep module must be loaded while the prefix points at /boot/grub2,
 # not after restoring the Fedora EFI module path.
 python3 - "$script" <<'PY'
