@@ -28,14 +28,20 @@ The GRUB disk contents are synchronized separately.
   a menu. Recovery/one-shot requests show a regular ten-second menu.
   When `sleep` or the background is unavailable the script falls back to a
   visible timed menu, so boot selection remains possible.
-- Normal BLS/OSTree boot entries are kept unchanged, including their default
-  selection and rollback semantics. A low-sorting generated BLS entry
-  `0000-astra-retro-debug-0.conf` starts the active/staged deployment with
-  Plymouth disabled and verbose logging. Its BLS metadata deliberately omits
-  `sort-key` and uses `version 0`: the previous `sort-key zz-astra-retro-debug`
-  incorrectly promoted Debug above the normal bootc entries, causing it to
-  become the default and suppress Plymouth. Existing deployment selection
-  (`saved_entry` / `next_entry`) is not overwritten.
+- Normal BLS/OSTree boot entries and rollback behavior remain untouched.
+  The Debug variant now uses the **same filename stem as its normal BLS**
+  entry with a `~astra-debug.conf` suffix, for example
+  `bootc_fedora-45.20261111.0-1~astra-debug.conf`. Fedora's blscfg
+  uses RPM version ordering of **filenames**: the previous
+  `0000-astra-retro-debug-0.conf` file was ranked first despite its
+  `version 0` and absence of `sort-key`. The `~` suffix sorts its debug
+  variant after the normal entry. Synchronisation removes the old
+  `0000-astra-retro-debug-0.conf` and stale `~astra-debug.conf` variants;
+  it keeps the normal bootc BLS entries unchanged. If the obsolete Debug
+  entry was explicitly saved in `grubenv`, only that exact bad reference
+  is cleared, leaving other bootc saved/next entries untouched. Debug
+  continues to disable Plymouth and enables verbose logging when selected
+  manually.
 - Fedora bootc can mount `/boot` read-only during normal operation. The
   synchronisation temporarily remounts only the **separate /boot mountpoint**
   read-write, writes artwork/modules/GRUB fragment/BLS debug entry, then
@@ -108,7 +114,8 @@ sudo grep -n 'ASTRA RETRO OS INSTALLED BRANDING' /boot/grub2/{console,user,custo
 sudo ls -l /boot/grub2/x86_64-efi/{gfxterm,gfxterm_background,png,sleep}.mod
 sudo journalctl -b -u astra-installed-boot.service --no-pager
 findmnt -T /boot/grub2 -o TARGET,SOURCE,VFS-OPTIONS
-sudo cat /boot/loader/entries/0000-astra-retro-debug-0.conf
+sudo ls -l /boot/loader/entries/*~astra-debug.conf
+sudo grub2-editenv /boot/grub2/grubenv list
 ```
 
 If the background is still missing on a freshly updated bootc system,
