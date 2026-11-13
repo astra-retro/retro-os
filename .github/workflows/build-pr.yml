@@ -109,6 +109,9 @@ jobs:
           sudo apt-get install -y --no-install-recommends grub-common
           bash branding/tests/test-grub-lexer.sh
           bash branding/tests/test-installed-boot.sh
+          # Validate every emulation shell script before launching Podman:
+          # an escaped find predicate previously failed only inside OCI.
+          bash build_files/test-emulation-build-order.sh
           just build retro-os "$IMAGE_TAG"
           just ostree-rechunk retro-os "$IMAGE_TAG"
           mkdir -p dist
