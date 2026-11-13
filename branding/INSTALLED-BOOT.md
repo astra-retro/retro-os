@@ -72,6 +72,30 @@ This fixes the confirmed lexer error; it does **not** prove that GRUB
 graphics modules can be loaded under Secure Boot. Verify that separately
 on the physical machine after the syntax error disappears.
 
+### Secure Boot graphical fallback
+
+On the user's UEFI machine, the **same** installed GRUB image appears when
+Secure Boot is disabled, and is absent with `shim_lock=y`. This strongly
+isolates the issue to signed-GRUB policy rather than `$root`, `$prefix`,
+or the PNG itself. An external `.mod` being present on disk does not make
+it trusted under shim lockdown.
+
+The installed fragment therefore **does not invoke `insmod`** with
+`shim_lock=y` / `lockdown=y`. It tries only commands already embedded
+in Fedora's signed GRUB, and switches to the graphical terminal only
+after a Unicode font loads. Without a font it preserves the usable
+text terminal instead of drawing borders using question marks. Without
+`background_image` built into the signed GRUB, a background image is
+**not possible through external unsigned modules** while preserving
+Secure Boot; it will boot without the background.
+
+For a reliably branded GRUB under Secure Boot, integrate the required
+`gfxterm_background` / PNG / font capabilities into an appropriately
+signed and trusted EFI GRUB image, subject to Fedora shim lockdown
+restrictions. This is intentionally **not** done in this PR: changing
+the signed boot chain requires a separate tested signing strategy.
+Do not disable Secure Boot just to work around missing artwork.
+
 ### Local validation
 
 ```bash
