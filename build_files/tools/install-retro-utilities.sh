@@ -52,8 +52,12 @@ download_checked \
   "$ps3dec_sha" "$tmp/ps3dec.tar.gz"
 mkdir -p "$tmp/ps3dec"
 tar -xzf "$tmp/ps3dec.tar.gz" -C "$tmp/ps3dec"
-test -s "$tmp/ps3dec/ps3dec"
-install -D -m 0755 "$tmp/ps3dec/ps3dec" /usr/bin/ps3dec
+mapfile -d '' -t ps3dec_binaries < <(find "$tmp/ps3dec" -type f -name ps3dec -print0)
+if (( ${#ps3dec_binaries[@]} != 1 )); then
+  echo "ERROR: expected exactly one ps3dec binary in $ps3dec_asset" >&2
+  exit 1
+fi
+install -D -m 0755 "${ps3dec_binaries[0]}" /usr/bin/ps3dec
 
 # 2. RainbowCookie32/rusty-psn, separate egui and CLI builds (MIT).
 # Install the egui binary as rusty-psn and the CLI as rusty-psn-cli.
@@ -66,7 +70,7 @@ install_rusty() {
     "$digest" "$tmp/$asset"
   mkdir -p "$dir"
   unzip -q "$tmp/$asset" -d "$dir"
-  mapfile -d '' -t binaries < <(find "$dir" -type f -name rusty-psn -print0)
+  mapfile -d '' -t binaries < <(find "$dir" -type f \\( -name rusty-psn -o -name rusty-psn-cli -o -name rusty-psn-egui \\) -print0)
   if (( ${#binaries[@]} != 1 )); then
     echo "ERROR: expected exactly one rusty-psn binary in $asset" >&2
     exit 1
