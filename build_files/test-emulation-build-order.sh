@@ -20,6 +20,12 @@ for cmd in ('/usr/bin/ps3dec', '/usr/bin/rusty-psn-cli', '/usr/bin/rusty-psn', '
     assert cmd in installer
 assert 'Skyscraper.AppDir/AppRun' in installer
 assert '--appimage-extract' in installer
+# The find grouping must use exactly one shell escape per parenthesis.
+# Double escaping (\\\\() led to a Bash parser error during OCI builds.
+assert r'\\( -name rusty-psn' in installer
+assert r'-name rusty-psn-egui \\)' in installer
+assert r'\\\\( -name rusty-psn' not in installer
+assert r'-name rusty-psn-egui \\\\)' not in installer
 
 helper_dir = Path('system_files/retro-emulation/usr/libexec/retro-os')
 for name in ('retro-emulation-setup', 'retro-fetch-esde', 'retro-launch-esde', 'retro-install-emudeck', 'retro-configure-esde'):
