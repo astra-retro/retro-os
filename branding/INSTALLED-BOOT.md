@@ -53,9 +53,29 @@ The GRUB disk contents are synchronized separately.
 No `grub2-install`, `grub2-mkconfig`, edits to the UEFI shim/GRUB stub
 or changes to `saved_entry` are performed.
 
+### GRUB lexer regression (PR #11)
+
+On the installed Fedora 45 machine, `grub2-script-check
+/boot/grub2/console.cfg` failed at line 46. The original generator used
+a shell-style `if [ ... ] || [ ... ]; then` expression, which GRUB's lexer
+rejected. The installed graphical hook now uses separate `if` commands
+to compute `astra_force_menu` without `||`.
+
+The sync script **refuses to replace** the selected hook unless
+`grub2-script-check` (or `grub-script-check`) approves the *complete*
+generated script. The build workflows also run
+`branding/tests/test-grub-lexer.sh` with the real GRUB checker before
+publishing an OCI image. Shell lint/tests alone are insufficient because
+GRUB syntax is not Bash syntax.
+
+This fixes the confirmed lexer error; it does **not** prove that GRUB
+graphics modules can be loaded under Secure Boot. Verify that separately
+on the physical machine after the syntax error disappears.
+
 ### Local validation
 
 ```bash
+bash branding/tests/test-grub-lexer.sh
 bash branding/tests/test-installed-boot.sh
 sudo systemctl status astra-installed-boot.service astra-installed-boot.path
 sudo grep -nE 'source.*(console|user|custom)\\.cfg' /boot/grub2/grub.cfg
