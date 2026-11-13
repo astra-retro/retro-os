@@ -92,6 +92,37 @@ sha_custom="$(sha256sum "$root/boot/grub2/custom.cfg" | cut -d' ' -f1)"
 ASTRA_ROOT="$root" "$script"
 [[ "$(sha256sum "$root/boot/grub2/custom.cfg" | cut -d' ' -f1)" == "$sha_custom" ]]
 
+# bootupd static GRUB loads console.cfg before blscfg. Prefer it to the
+# late custom.cfg hook, and migrate the previous Astra section without touching
+# the user's own GRUB configuration.
+cat > "$root/boot/grub2/grub.cfg" <<'GRUB'
+if [ -f $prefix/console.cfg ]; then
+  source $prefix/console.cfg
+fi
+blscfg
+if [ -f $prefix/custom.cfg ]; then
+  source $prefix/custom.cfg
+fi
+GRUB
+cat > "$root/boot/grub2/console.cfg" <<'GRUB'
+# User console customization
+set user_console_option=yes
+GRUB
+ASTRA_ROOT="$root" "$script"
+consolecfg="$root/boot/grub2/console.cfg"
+grep -Fq 'set user_console_option=yes' "$consolecfg"
+grep -Fq 'background_image -m stretch' "$consolecfg"
+! grep -Fq 'BEGIN ASTRA RETRO OS INSTALLED BRANDING' "$root/boot/grub2/custom.cfg"
+sha_console="$(sha256sum "$consolecfg" | cut -d' ' -f1)"
+ASTRA_ROOT="$root" "$script"
+[[ "$(sha256sum "$consolecfg" | cut -d' ' -f1)" == "$sha_console" ]]
+# A stale old fragment must not be kept in a different GRUB hook.
+grep -Fq 'set my_grub_setting=yes' "$root/boot/grub2/console.cfg" && exit 1
+# Reapplying with an inline console hook must remain supported.
+printf 'if [ -f $prefix/console.cfg ]; then source $prefix/console.cfg; fi\nblscfg\n' > "$root/boot/grub2/grub.cfg"
+ASTRA_ROOT="$root" "$script"
+[[ "$(sha256sum "$consolecfg" | cut -d' ' -f1)" == "$sha_console" ]]
+
 # Commented-out hooks must never be mistaken for a real GRUB inclusion.
 printf '# source $prefix/custom.cfg\nblscfg\n' > "$root/boot/grub2/grub.cfg"
 rm -f "$root/boot/grub2/custom.cfg"
