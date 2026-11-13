@@ -61,6 +61,7 @@ dnf5 -y install \
     libinput-utils \
     libxcrypt-compat \
     linuxconsoletools \
+    openssl3-libs \
     lm_sensors \
     lsb_release \
     lshw \
@@ -91,6 +92,14 @@ dnf5 -y install \
     yad \
     ydotool \
     zenity
+
+# Fedora 45 ships OpenSSL 4 as openssl-libs; native emulators such as
+# Ryujinx/Ryubing may still need the OpenSSL 3 ABI (libssl.so.3).
+# Install the official Fedora compatibility RPM, not unsupported OpenSSL 1.1
+# and never a symlink from libssl.so.3 to the incompatible libssl.so.4.
+rpm -q openssl3-libs
+test -s /usr/lib64/libssl.so.3
+test -s /usr/lib64/libcrypto.so.3
 
 # -- Disable unnecessary services --
 # Mask services that are not needed.
