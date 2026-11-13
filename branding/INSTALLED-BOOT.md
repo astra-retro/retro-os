@@ -11,11 +11,13 @@ The GRUB disk contents are synchronized separately.
 
 - `astra-installed-boot.service` copies the existing GRUB image and EFI
   modules to `/boot/grub2`, then writes a managed fragment into the
-  `user.cfg` or `custom.cfg` file **actually sourced** by the installed
-  `/boot/grub2/grub.cfg` (bootupd/Fedora variants). Existing custom lines
-  are kept. Both multiline and inline conditional `source` directives are
-  supported; commented-out directives are ignored. Missing/unsupported hooks
-  are reported as errors rather than silently skipping the wallpaper.
+  **early** `console.cfg` hook (preferred for modern bootupd static GRUB),
+  or a sourced `user.cfg` / `custom.cfg` hook on older layouts.
+  Modern bootupd loads `console.cfg` **before** `blscfg`, whereas
+  `custom.cfg` is processed afterwards. Existing user lines are preserved,
+  and old Astra-managed sections are migrated to the early hook to avoid
+  duplicate execution. Inline `source` directives are supported;
+  commented-out directives are ignored. Unsupported layouts fail loudly.
 - GRUB loads the `sleep` module while `$prefix` points to the staged
   `/boot/grub2` modules. Restoring the EFI `/EFI/fedora` prefix before
   loading `sleep.mod` can break the graphical wait on installed systems.
@@ -43,11 +45,23 @@ or changes to `saved_entry` are performed.
 ```bash
 bash branding/tests/test-installed-boot.sh
 sudo systemctl status astra-installed-boot.service astra-installed-boot.path
-sudo grep -nE 'source.*(user|custom)\\.cfg' /boot/grub2/grub.cfg
-sudo ls -l /boot/grub2/{user,custom}.cfg /boot/grub2/astra-background.png
+sudo grep -nE 'source.*(console|user|custom)\\.cfg' /boot/grub2/grub.cfg
+sudo ls -l /boot/grub2/{console,user,custom}.cfg /boot/grub2/astra-background.png
+sudo grep -n 'ASTRA RETRO OS INSTALLED BRANDING' /boot/grub2/{console,user,custom}.cfg 2>/dev/null
+sudo ls -l /boot/grub2/x86_64-efi/{gfxterm,gfxterm_background,png,sleep}.mod
 sudo journalctl -b -u astra-installed-boot.service --no-pager
 sudo cat /boot/loader/entries/0000-astra-retro-debug-0.conf
 ```
+
+If the background is still missing on a freshly updated bootc system,
+first identify the **actual GRUB files on disk**, not only the OCI image.
+Use `sudo systemctl restart astra-installed-boot.service` and check the
+journal before rebooting. A visible unthemed menu means either the sourced
+fragment was not executed, the artwork/modules could not be loaded by GRUB,
+or the firmware/Secure Boot configuration rejected external modules. A
+successful systemd service only confirms that files were written: it does
+**not** prove that signed GRUB rendered the background. Validate graphically
+on real UEFI and Secure Boot machines before declaring this regression fixed.
 
 The test covers first installation, idempotency, GRUB user customisations,
 updated BLS entries, and an unknown GRUB layout. A real UEFI/Secure Boot
