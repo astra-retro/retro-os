@@ -1,8 +1,13 @@
 #!/usr/bin/env bash
 # Regression: the extracted linuxdeploy AppRun chain must run as non-root.
 set -euo pipefail
-cd "$(dirname "${BASH_SOURCE[0]}")/../.."
-helper="$PWD/build_files/tools/install-extracted-appdir.sh"
+# This file lives in build_files/; its parent is the repository root.
+# Resolve from this script, not the caller working directory.
+script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+repo_root="$(cd -- "$script_dir/.." && pwd)"
+cd "$repo_root"
+helper="$script_dir/tools/install-extracted-appdir.sh"
+[[ -f "$helper" ]] || { echo "Missing AppDir installer: $helper" >&2; exit 1; }
 bash -n "$helper"
 tmp="$(mktemp -d)"
 trap 'rm -rf "$tmp"' EXIT
