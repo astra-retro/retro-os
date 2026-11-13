@@ -31,7 +31,11 @@ The GRUB disk contents are synchronized separately.
 - Normal BLS/OSTree boot entries are kept unchanged, including their default
   selection and rollback semantics. A low-sorting generated BLS entry
   `0000-astra-retro-debug-0.conf` starts the active/staged deployment with
-  Plymouth disabled and verbose logging.
+  Plymouth disabled and verbose logging. Its BLS metadata deliberately omits
+  `sort-key` and uses `version 0`: the previous `sort-key zz-astra-retro-debug`
+  incorrectly promoted Debug above the normal bootc entries, causing it to
+  become the default and suppress Plymouth. Existing deployment selection
+  (`saved_entry` / `next_entry`) is not overwritten.
 - Fedora bootc can mount `/boot` read-only during normal operation. The
   synchronisation temporarily remounts only the **separate /boot mountpoint**
   read-write, writes artwork/modules/GRUB fragment/BLS debug entry, then
