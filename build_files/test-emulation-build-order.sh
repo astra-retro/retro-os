@@ -18,7 +18,11 @@ for project in ('Redrrx/ps3dec', 'RainbowCookie32/rusty-psn', 'Gemba/skyscraper'
     assert project in installer
 for cmd in ('/usr/bin/ps3dec', '/usr/bin/rusty-psn-cli', '/usr/bin/rusty-psn', '/usr/bin/Skyscraper'):
     assert cmd in installer
-assert 'Skyscraper.AppDir/AppRun' in installer
+# The AppRun path is now assembled from $appdir, rather than a single
+# literal string: keep the test aligned with the real installation.
+assert 'appdir=/usr/libexec/retro-os/Skyscraper.AppDir' in installer
+assert 'test -x "$appdir/AppRun"' in installer
+assert 'exec "$APPDIR/AppRun" "$@"' in installer
 assert '--appimage-extract' in installer
 # Extracted AppImages must be copied without restrictive permissions or
 # temporary SELinux contexts, then verified as an unprivileged user.
