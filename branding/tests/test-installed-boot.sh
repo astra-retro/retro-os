@@ -67,9 +67,46 @@ ASTRA_ROOT="$root" "$script"
 grep -Fq 'ostree=/ostree/boot.1/astra/b/0' "$debug"
 ! grep -Fq 'ostree=/ostree/boot.1/astra/a/0' "$debug"
 
+# The sleep module must be loaded while the prefix points at /boot/grub2,
+# not after restoring the Fedora EFI module path.
+python3 - "$script" <<'PY'
+import sys
+from pathlib import Path
+source = Path(sys.argv[1]).read_text()
+branding = source.split("cat >> \"$tmp\" <<'GRUB'", 1)[1].split("\nGRUB\n", 1)[0]
+assert branding.index("if insmod sleep; then") < branding.index("set prefix=$astra_previous_prefix")
+assert 'if [ "${astra_sleep_available}" = 1 ]; then' in branding
+PY
+
+# bootupd may use custom.cfg, with the source on the same line as a guard.
+cat > "$root/boot/grub2/grub.cfg" <<'GRUB'
+if [ -f $prefix/custom.cfg ]; then source $prefix/custom.cfg; fi
+blscfg
+GRUB
+rm -f "$root/boot/grub2/user.cfg"
+ASTRA_ROOT="$root" "$script"
+grep -Fq 'BEGIN ASTRA RETRO OS INSTALLED BRANDING' "$root/boot/grub2/custom.cfg"
+grep -Fq 'background_image -m stretch' "$root/boot/grub2/custom.cfg"
+# Reruns are idempotent for bootupd's custom.cfg variant.
+sha_custom="$(sha256sum "$root/boot/grub2/custom.cfg" | cut -d' ' -f1)"
+ASTRA_ROOT="$root" "$script"
+[[ "$(sha256sum "$root/boot/grub2/custom.cfg" | cut -d' ' -f1)" == "$sha_custom" ]]
+
+# Commented-out hooks must never be mistaken for a real GRUB inclusion.
+printf '# source $prefix/custom.cfg\nblscfg\n' > "$root/boot/grub2/grub.cfg"
+rm -f "$root/boot/grub2/custom.cfg"
+if ASTRA_ROOT="$root" "$script"; then
+  echo 'ERROR: accepted a commented-out GRUB hook' >&2
+  exit 1
+fi
+[[ ! -f "$root/boot/grub2/custom.cfg" ]]
+
 # An unknown GRUB layout must be left untouched, not rewritten.
 printf 'blscfg\n' > "$root/boot/grub2/grub.cfg"
 rm -f "$usercfg"
-ASTRA_ROOT="$root" "$script"
+if ASTRA_ROOT="$root" "$script"; then
+  echo 'ERROR: accepted an unsupported GRUB layout' >&2
+  exit 1
+fi
 [[ ! -f "$usercfg" ]]
 echo 'Installed GRUB branding tests passed'
