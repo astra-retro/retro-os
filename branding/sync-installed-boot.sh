@@ -155,25 +155,50 @@ fi
 if [ -n "$astra_boot_prefix" ]; then
     set astra_previous_prefix=$prefix
     set prefix=$astra_boot_prefix
-    insmod all_video
-    insmod gfxterm
-    insmod gfxterm_background
-    insmod png
-    if [ -f "$astra_boot_prefix/fonts/unicode.pf2" ]; then
-        loadfont "$astra_boot_prefix/fonts/unicode.pf2"
+    # shim_lock forbids loading unsigned modules from the /boot filesystem.
+    # Fedora's signed GRUB may already contain the display commands: use
+    # those built-ins directly in Secure Boot mode, never external insmod.
+    set astra_secure_boot=0
+    if [ "${shim_lock}" = y ]; then
+        set astra_secure_boot=1
     fi
-    set gfxmode=1920x1080,1600x900,1366x768,1280x720,auto
-    terminal_output gfxterm
-    set gfxpayload=keep
-    set menu_color_normal=white/black
-    set menu_color_highlight=black/light-cyan
-    if background_image -m stretch "$astra_boot_prefix/astra-background.png"; then
-        set astra_background_ok=1
+    if [ "${lockdown}" = y ]; then
+        set astra_secure_boot=1
+    fi
+    if [ "${astra_secure_boot}" = 0 ]; then
+        insmod all_video
+        insmod gfxterm
+        insmod gfxterm_background
+        insmod png
+    fi
+    # gfxterm without an available font displays '?' instead of the menu
+    # frame glyphs. Never switch to gfxterm unless a Unicode font loads.
+    set astra_font_ok=0
+    if loadfont unicode; then
+        set astra_font_ok=1
+    elif [ -f "$astra_boot_prefix/fonts/unicode.pf2" ]; then
+        if loadfont "$astra_boot_prefix/fonts/unicode.pf2"; then
+            set astra_font_ok=1
+        fi
+    fi
+    if [ "${astra_font_ok}" = 1 ]; then
+        set gfxmode=1920x1080,1600x900,1366x768,1280x720,auto
+        if terminal_output gfxterm; then
+            set gfxpayload=keep
+            set menu_color_normal=white/black
+            set menu_color_highlight=black/light-cyan
+            if background_image -m stretch "$astra_boot_prefix/astra-background.png"; then
+                set astra_background_ok=1
+            fi
+        fi
     fi
     # The original EFI prefix may be /EFI/fedora (without sleep.mod).
-    # Load sleep from /boot/grub2 while the module search path is valid.
-    if insmod sleep; then
-        set astra_sleep_available=1
+    # The sleep module is attempted only when shim_lock is off; it is not
+    # necessarily embedded in the signed Fedora GRUB image.
+    if [ "${astra_secure_boot}" = 0 ]; then
+        if insmod sleep; then
+            set astra_sleep_available=1
+        fi
     fi
     set prefix=$astra_previous_prefix
 fi
