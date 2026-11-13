@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
-bash -n build_files/build.sh build_files/05-retro-emulation.sh build_files/06-finalize.sh build_files/tools/install-retro-utilities.sh
+bash -n build_files/build.sh build_files/05-retro-emulation.sh build_files/06-finalize.sh build_files/tools/install-retro-utilities.sh build_files/tools/install-extracted-appdir.sh
 python3 - <<'PY'
 from pathlib import Path
 source = Path('build_files/build.sh').read_text()
@@ -24,13 +24,15 @@ assert 'appdir=/usr/libexec/retro-os/Skyscraper.AppDir' in installer
 assert 'test -x "$appdir/AppRun"' in installer
 assert 'exec "$APPDIR/AppRun" "$@"' in installer
 assert '--appimage-extract' in installer
-# Extracted AppImages must be copied without restrictive permissions or
-# temporary SELinux contexts, then verified as an unprivileged user.
-assert 'cp -a "$tmp/squashfs-root"' not in installer
-assert 'cp -R --no-preserve=mode,ownership,context' in installer
-assert 'chmod -R u+rwX,go+rX,go-w "$appdir"' in installer
-assert 'chmod 0755 "$appdir/AppRun"' in installer
-assert 'runuser -u nobody -- test -x "$appdir/AppRun"' in installer
+# Verify the installed AppDir helper is used. It must preserve upstream
+# executable modes while dropping temporary owner/SELinux contexts.
+helper_script = Path('build_files/tools/install-extracted-appdir.sh')
+assert helper_script.is_file()
+helper = helper_script.read_text()
+assert 'bash /ctx/tools/install-extracted-appdir.sh "$tmp/squashfs-root" "$appdir"' in installer
+assert 'cp -R --preserve=mode --no-preserve=ownership,context' in helper
+assert 'AppRun.wrapped' in helper
+assert 'runuser -u nobody -- test -x "$dst/$entry"' in helper
 assert 'APPDIR=/usr/libexec/retro-os/Skyscraper.AppDir' in installer
 
 # Find predicate parentheses must be escaped exactly once in the shell.
