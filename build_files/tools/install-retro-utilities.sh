@@ -94,11 +94,34 @@ chmod 0755 "$tmp/$skyscraper_asset"
   "./$skyscraper_asset" --appimage-extract >/dev/null
 )
 test -x "$tmp/squashfs-root/AppRun"
-install -d /usr/libexec/retro-os
-cp -a "$tmp/squashfs-root" /usr/libexec/retro-os/Skyscraper.AppDir
+appdir=/usr/libexec/retro-os/Skyscraper.AppDir
+install -d -m 0755 /usr/libexec/retro-os
+# Do not use cp -a here: an extracted AppImage may contain directories with
+# restrictive modes and temporary SELinux labels. Root can execute AppRun at
+# build time while a regular user gets EACCES ("Permission denied") after
+# boot. Do not copy file labels from /tmp into immutable /usr.
+cp -R --no-preserve=mode,ownership,context "$tmp/squashfs-root" "$appdir"
+# All resources and parent directories must be accessible to desktop users.
+# Retain executable bits on bundled shared-object tools and scripts.
+chmod -R u+rwX,go+rX,go-w "$appdir"
+# Explicitly mark the entry point executable for everyone. This also covers
+# AppRun symlinks, where chmod updates the actual linked executable.
+chmod 0755 "$appdir/AppRun"
+test -x "$appdir/AppRun"
+# Check access as an unprivileged user; 'test -x' as root misses 0700 parents.
+if command -v runuser >/dev/null 2>&1; then
+  runuser -u nobody -- test -x "$appdir/AppRun" || {
+    echo "ERROR: Skyscraper AppRun not executable by a normal user" >&2
+    exit 1
+  }
+fi
 cat > /usr/bin/Skyscraper <<'SH'
 #!/bin/sh
-exec /usr/libexec/retro-os/Skyscraper.AppDir/AppRun "$@"
+# linuxdeploy AppRun normally sees APPDIR from the AppImage runtime; supply
+# it explicitly now that the application is stored as an extracted AppDir.
+APPDIR=/usr/libexec/retro-os/Skyscraper.AppDir
+export APPDIR
+exec "$APPDIR/AppRun" "$@"
 SH
 chmod 0755 /usr/bin/Skyscraper
 
