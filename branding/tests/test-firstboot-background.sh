@@ -32,5 +32,15 @@ assert '/usr/share/dconf/profile/gdm' in common
 assert 'script_dir/desktop/20-astra-gdm-background' in common
 assert 'wallpaper-pixel-art.png' in common
 assert 'python3 "$script_dir/gdm/install-greeter-wallpaper.py"' in common
+keyboard = Path('branding/desktop/30-astra-gdm-keyboard')
+assert config.read(keyboard, encoding='utf-8') == [str(keyboard)]
+sources = config['org/gnome/desktop/input-sources']['sources']
+assert sources == "[('xkb', 'fr'), ('xkb', 'us')]"
+assert config['org/gnome/desktop/input-sources']['xkb-options'] == '@as []'
+assert 'locks' not in keyboard.read_text()
+assert 'script_dir/desktop/30-astra-gdm-keyboard' in common
+assert '/etc/dconf/db/gdm.d/30-astra-gdm-keyboard' in common
+assert common.index('30-astra-gdm-keyboard') < common.index('dconf update')
+
 PY
 echo "GNOME Initial Setup GDM background checks passed"
