@@ -74,6 +74,11 @@ if [[ "$mode" == installed ]]; then
   fi
   install -m 0644 "$script_dir/desktop/20-astra-gdm-background" \
     /etc/dconf/db/gdm.d/20-astra-gdm-background
+  # The Live installer uses French AZERTY, but the installed GDM greeter
+  # has its own input source settings independent of the logged-in user.
+  # Set an unlocked greeter default with US available as a fallback.
+  install -m 0644 "$script_dir/desktop/30-astra-gdm-keyboard" \
+    /etc/dconf/db/gdm.d/30-astra-gdm-keyboard
   # GNOME Shell (not dconf) owns the pre-login greeter's background.
   python3 "$script_dir/gdm/install-greeter-wallpaper.py"
   # GDM has a separate settings database. Keep the monitor active while
