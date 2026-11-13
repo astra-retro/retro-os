@@ -12,19 +12,23 @@ asset="$(at /usr/share/astra-retro-os/grub-background.png)"
 grubdir="$(at /boot/grub2)"
 grubcfg="$grubdir/grub.cfg"
 entries="$(at /boot/loader/entries)"
-[[ -s "$asset" ]] || { log 'GRUB artwork not found; skipping'; exit 0; }
-[[ -s "$grubcfg" ]] || { log 'No installed GRUB config; skipping (another bootloader?)'; exit 0; }
+[[ -s "$asset" ]] || { log 'ERROR: installed GRUB artwork missing from OCI image'; exit 1; }
+[[ -s "$grubcfg" ]] || { log 'ERROR: /boot/grub2/grub.cfg is missing or empty'; exit 1; }
 
-# Fedora/bootupd uses user.cfg before blscfg; older GRUB generated configs
-# include custom.cfg. Modify only the supported extension point.
+# bootupd static configurations load user.cfg (older) or custom.cfg (newer).
+# Some Fedora GRUB configurations put "source" on the same line as "if".
+# Recognise either form and ignore comments, rather than silently skipping
+# installation when the literal source directive is not at column zero.
+# Never rewrite bootupd's /boot/grub2/grub.cfg or the signed EFI stub.
+grub_sources="$(sed -e '/^[[:space:]]*#/d' -e 's/[[:space:]]#.*$//' "$grubcfg")"
 config=''
-if grep -Eq '^[[:space:]]*source[[:space:]].*user\.cfg' "$grubcfg"; then
+if grep -Eq '(^|[[:space:];])source[[:space:]]+[^[:space:];#]*user\.cfg' <<< "$grub_sources"; then
   config="$grubdir/user.cfg"
-elif grep -Eq '^[[:space:]]*source[[:space:]].*custom\.cfg' "$grubcfg"; then
+elif grep -Eq '(^|[[:space:];])source[[:space:]]+[^[:space:];#]*custom\.cfg' <<< "$grub_sources"; then
   config="$grubdir/custom.cfg"
 else
-  log 'No user.cfg/custom.cfg source in grub.cfg; leaving GRUB unchanged'
-  exit 0
+  log 'ERROR: no sourced user.cfg/custom.cfg in /boot/grub2/grub.cfg; cannot safely install branding'
+  exit 1
 fi
 
 install -d "$grubdir" "$entries"
@@ -68,6 +72,7 @@ cat >> "$tmp" <<'GRUB'
 # BEGIN ASTRA RETRO OS INSTALLED BRANDING
 # GRUB root may refer to /boot or to the root filesystem.
 set astra_background_ok=0
+set astra_sleep_available=0
 set astra_boot_prefix=
 if search --no-floppy --file --set=astra_boot /grub2/astra-background.png; then
     set astra_boot_prefix="($astra_boot)/grub2"
@@ -92,6 +97,11 @@ if [ -n "$astra_boot_prefix" ]; then
     if background_image -m stretch "$astra_boot_prefix/astra-background.png"; then
         set astra_background_ok=1
     fi
+    # The original EFI prefix may be /EFI/fedora (without sleep.mod).
+    # Load sleep from /boot/grub2 while the module search path is valid.
+    if insmod sleep; then
+        set astra_sleep_available=1
+    fi
     set prefix=$astra_previous_prefix
 fi
 # Do not override saved_entry/next_entry: bootc manages deployment selection.
@@ -108,7 +118,7 @@ if [ "${menu_show_once}" = 1 ] || [ "${boot_success}" = 0 ]; then
     # Recovery and explicit one-shot menu requests should not be hidden.
     set timeout=10
 elif [ "${astra_background_ok}" = 1 ]; then
-    if insmod sleep; then
+    if [ "${astra_sleep_available}" = 1 ]; then
         if sleep --interruptible 5; then
             # 5 seconds with no key: boot the normal default immediately.
             set timeout=0
