@@ -35,7 +35,63 @@ else
 fi
 log "Selected GRUB hook: ${config#"$root"}"
 
-install -d "$grubdir" "$entries"
+# Fedora Atomic/bootc deliberately mounts /boot read-only after boot. The
+# systemd service runs in its own mount namespace; temporarily remount /boot
+# writable only for this synchronisation, then restore read-only on *every*
+# exit path. In Anaconda's %post (ASTRA_ROOT) restore the installer mount too.
+# Refuse to remount '/' or another parent filesystem when /boot is not an
+# independent mountpoint: that could change the host OS unexpectedly.
+boot_mount="$(at /boot)"
+boot_remounted=0
+tmp=''
+tmp_bls=''
+cleanup() {
+  local status=$?
+  trap - EXIT
+  [[ -z "$tmp" ]] || rm -f "$tmp" || true
+  [[ -z "$tmp_bls" ]] || rm -f "$tmp_bls" || true
+  if [[ "$boot_remounted" == 1 ]]; then
+    if ! mount --options-source=disable -o remount,ro "$boot_mount"; then
+      log "ERROR: unable to restore read-only $boot_mount"
+      status=1
+    else
+      log "Restored read-only $boot_mount"
+    fi
+  fi
+  exit "$status"
+}
+trap cleanup EXIT
+
+boot_vfs_options="$(findmnt -n -o VFS-OPTIONS -T "$grubdir")" || {
+  log "ERROR: unable to inspect $grubdir mount options"
+  exit 1
+}
+case ",$boot_vfs_options," in
+  *,ro,*)
+    if ! mountpoint -q "$boot_mount"; then
+      log "ERROR: $boot_mount is not a separate mountpoint; refusing to remount its parent"
+      exit 1
+    fi
+    log "Temporarily remounting read-only $boot_mount writable"
+    mount --options-source=disable -o remount,rw "$boot_mount" || {
+      log "ERROR: failed to remount $boot_mount writable"
+      exit 1
+    }
+    boot_remounted=1
+    boot_vfs_options="$(findmnt -n -o VFS-OPTIONS -T "$grubdir")" || exit 1
+    case ",$boot_vfs_options," in
+      *,ro,*)
+        log "ERROR: $boot_mount is still read-only after remount"
+        exit 1
+        ;;
+    esac
+    ;;
+esac
+
+# mkdir -p leaves existing directory permissions unchanged. 'install -d'
+# tries to chmod existing directories, which failed immediately on read-only
+# Fedora Atomic /boot mounts even when the directory already existed.
+mkdir -p "$grubdir" "$entries"
 if ! cmp -s "$asset" "$grubdir/astra-background.png"; then
   install -m 0644 "$asset" "$grubdir/astra-background.png"
 fi
@@ -78,7 +134,6 @@ for candidate in "$grubdir/console.cfg" "$grubdir/user.cfg" "$grubdir/custom.cfg
   fi
 done
 tmp="$(mktemp "$grubdir/.astra-grub.XXXXXX")"
-trap 'rm -f "$tmp"' EXIT
 if [[ -f "$config" ]]; then
   awk -v start="$start" -v end="$end" '
     $0 == start {skip=1; next}
@@ -195,7 +250,6 @@ fi
 [[ -n "$source_bls" ]] || { log 'No normal BLS entry yet; debug entry deferred'; exit 0; }
 
 tmp_bls="$(mktemp "$entries/.astra-debug.XXXXXX")"
-trap 'rm -f "$tmp" "$tmp_bls"' EXIT
 awk '
   BEGIN {has_title=0; has_sort=0; has_options=0}
   /^title[[:space:]]/ {
