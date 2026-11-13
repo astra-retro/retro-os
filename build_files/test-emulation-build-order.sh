@@ -18,10 +18,10 @@ for project in ('Redrrx/ps3dec', 'RainbowCookie32/rusty-psn', 'Gemba/skyscraper'
     assert project in installer
 for cmd in ('/usr/bin/ps3dec', '/usr/bin/rusty-psn-cli', '/usr/bin/rusty-psn', '/usr/bin/Skyscraper'):
     assert cmd in installer
-# The AppRun path is now assembled from $appdir, rather than a single
-# literal string: keep the test aligned with the real installation.
+# The staging script delegates all AppDir permission validation to the
+# helper. Do not assert a literal validation command in this caller:
+# its implementation and variable names belong to the helper instead.
 assert 'appdir=/usr/libexec/retro-os/Skyscraper.AppDir' in installer
-assert 'test -x "$appdir/AppRun"' in installer
 assert 'exec "$APPDIR/AppRun" "$@"' in installer
 assert '--appimage-extract' in installer
 # Verify the installed AppDir helper is used. It must preserve upstream
@@ -32,6 +32,8 @@ helper = helper_script.read_text()
 assert 'bash /ctx/tools/install-extracted-appdir.sh "$tmp/squashfs-root" "$appdir"' in installer
 assert 'cp -R --preserve=mode --no-preserve=ownership,context' in helper
 assert 'AppRun.wrapped' in helper
+assert 'for entry in AppRun AppRun.wrapped; do' in helper
+assert '[[ -x "$dst/$entry" ]]' in helper
 assert 'runuser -u nobody -- test -x "$dst/$entry"' in helper
 assert 'APPDIR=/usr/libexec/retro-os/Skyscraper.AppDir' in installer
 
