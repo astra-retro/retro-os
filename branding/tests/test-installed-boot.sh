@@ -57,6 +57,23 @@ grep -Fq 'set astra_background_ok=0' "$usercfg"
 grep -Fq 'set astra_background_ok=1' "$usercfg"
 grep -Fq 'set timeout=10' "$usercfg"
 grep -Fq 'set astra_force_menu=0' "$usercfg"
+# Secure Boot must never execute external insmod; a missing Unicode font
+# must keep GRUB in the original text terminal (no '?' box characters).
+grep -Fq 'if [ "${shim_lock}" = y ]; then' "$usercfg"
+grep -Fq 'if [ "${astra_secure_boot}" = 0 ]; then' "$usercfg"
+grep -Fq 'if loadfont unicode; then' "$usercfg"
+grep -Fq 'if [ "${astra_font_ok}" = 1 ]; then' "$usercfg"
+python3 - "$usercfg" <<'PY'
+import sys
+from pathlib import Path
+s=Path(sys.argv[1]).read_text()
+graphics=s.split('    if [ "${astra_secure_boot}" = 0 ]; then',1)[1].split('    fi',1)[0]
+assert 'insmod gfxterm_background' in graphics
+font=s.index('if loadfont unicode; then')
+terminal=s.index('if terminal_output gfxterm; then')
+fontguard=s.index('if [ "${astra_font_ok}" = 1 ]; then')
+assert font < fontguard < terminal
+PY
 grep -Fq 'if [ "${menu_show_once}" = 1 ]; then' "$usercfg"
 grep -Fq 'if [ "${boot_success}" = 0 ]; then' "$usercfg"
 ! grep -Fq ' || ' "$usercfg"
