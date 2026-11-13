@@ -1,0 +1,8 @@
+# The Live ISO defaults to a French AZERTY keyboard, but the installed
+# GNOME user's input sources are separate from GDM's login-session profile.
+# Make the login screen default consistent with the French installer.
+# Leave the secondary US layout selectable and do not lock either key.
+# Users and administrators can still select a different system layout.
+[org/gnome/desktop/input-sources]
+sources=[('xkb', 'fr'), ('xkb', 'us')]
+xkb-options=@as []
