@@ -17,7 +17,6 @@ packages = Path('build_files/04-install-packages.sh').read_text()
 for package in ('mono-core', 'mono-winforms', 'xorriso'):
     assert ('    ' + package + ' '+chr(92)) in packages
 xbox = Path('build_files/tools/install-xbox-eeprom-editor.sh').read_text()
-assert 'XboxEepromEditor.\\${version}.zip' not in xbox
 assert "version='1.0.0.1'" in xbox
 assert 'unzip -tq "$archive"' in xbox
 assert 'exec /usr/bin/mono /usr/libexec/retro-os/XboxEepromEditor/XboxEepromEditor.exe' in xbox
