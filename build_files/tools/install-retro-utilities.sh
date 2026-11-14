@@ -94,11 +94,18 @@ chmod 0755 "$tmp/$skyscraper_asset"
   "./$skyscraper_asset" --appimage-extract >/dev/null
 )
 test -x "$tmp/squashfs-root/AppRun"
-install -d /usr/libexec/retro-os
-cp -a "$tmp/squashfs-root" /usr/libexec/retro-os/Skyscraper.AppDir
+appdir=/usr/libexec/retro-os/Skyscraper.AppDir
+# Preserve executable bits for every bundled program, especially
+# AppRun.wrapped (the actual application executable invoked by AppRun).
+# The helper also verifies both entry points as an unprivileged user.
+bash /ctx/tools/install-extracted-appdir.sh "$tmp/squashfs-root" "$appdir"
 cat > /usr/bin/Skyscraper <<'SH'
 #!/bin/sh
-exec /usr/libexec/retro-os/Skyscraper.AppDir/AppRun "$@"
+# linuxdeploy AppRun normally sees APPDIR from the AppImage runtime; supply
+# it explicitly now that the application is stored as an extracted AppDir.
+APPDIR=/usr/libexec/retro-os/Skyscraper.AppDir
+export APPDIR
+exec "$APPDIR/AppRun" "$@"
 SH
 chmod 0755 /usr/bin/Skyscraper
 

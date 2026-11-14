@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
-bash -n build_files/build.sh build_files/05-retro-emulation.sh build_files/06-finalize.sh build_files/tools/install-retro-utilities.sh
+bash -n build_files/build.sh build_files/05-retro-emulation.sh build_files/06-finalize.sh build_files/tools/install-retro-utilities.sh build_files/tools/install-extracted-appdir.sh
 python3 - <<'PY'
 from pathlib import Path
 source = Path('build_files/build.sh').read_text()
@@ -18,8 +18,25 @@ for project in ('Redrrx/ps3dec', 'RainbowCookie32/rusty-psn', 'Gemba/skyscraper'
     assert project in installer
 for cmd in ('/usr/bin/ps3dec', '/usr/bin/rusty-psn-cli', '/usr/bin/rusty-psn', '/usr/bin/Skyscraper'):
     assert cmd in installer
-assert 'Skyscraper.AppDir/AppRun' in installer
+# The staging script delegates all AppDir permission validation to the
+# helper. Do not assert a literal validation command in this caller:
+# its implementation and variable names belong to the helper instead.
+assert 'appdir=/usr/libexec/retro-os/Skyscraper.AppDir' in installer
+assert 'exec "$APPDIR/AppRun" "$@"' in installer
 assert '--appimage-extract' in installer
+# Verify the installed AppDir helper is used. It must preserve upstream
+# executable modes while dropping temporary owner/SELinux contexts.
+helper_script = Path('build_files/tools/install-extracted-appdir.sh')
+assert helper_script.is_file()
+helper = helper_script.read_text()
+assert 'bash /ctx/tools/install-extracted-appdir.sh "$tmp/squashfs-root" "$appdir"' in installer
+assert 'cp -R --preserve=mode --no-preserve=ownership,context' in helper
+assert 'AppRun.wrapped' in helper
+assert 'for entry in AppRun AppRun.wrapped; do' in helper
+assert '[[ -x "$dst/$entry" ]]' in helper
+assert 'runuser -u nobody -- test -x "$dst/$entry"' in helper
+assert 'APPDIR=/usr/libexec/retro-os/Skyscraper.AppDir' in installer
+
 # Find predicate parentheses must be escaped exactly once in the shell.
 # A duplicate backslash caused the parser failure reported in CI.
 slash = chr(92)
@@ -35,4 +52,12 @@ for name in ('retro-emulation-setup', 'retro-fetch-esde', 'retro-launch-esde', '
 assert Path('system_files/retro-emulation/usr/lib/systemd/user/retro-emulation-setup.service').is_file()
 assert Path('system_files/retro-emulation/usr/share/retro-os/esde/splash.svg').is_file()
 PY
+bash build_files/test-skyscraper-appdir.sh
+# Regression for GitHub runners: ensure this test also resolves its helper
+# correctly when invoked from outside the repository working directory.
+repo_root="$PWD"
+(
+  cd /tmp
+  bash "$repo_root/build_files/test-skyscraper-appdir.sh"
+)
 echo 'Retro emulation install-order checks passed'
