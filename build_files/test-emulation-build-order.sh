@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
-bash -n build_files/build.sh build_files/05-retro-emulation.sh build_files/06-finalize.sh build_files/tools/install-retro-utilities.sh build_files/tools/install-extracted-appdir.sh
+bash -n build_files/build.sh build_files/05-retro-emulation.sh build_files/06-finalize.sh build_files/tools/install-retro-utilities.sh build_files/tools/install-extracted-appdir.sh build_files/tools/install-xbox-eeprom-editor.sh
 python3 - <<'PY'
 from pathlib import Path
 source = Path('build_files/build.sh').read_text()
@@ -12,6 +12,16 @@ emulation = Path('build_files/05-retro-emulation.sh').read_text()
 assert emulation.index('cp --archive --verbose --force /tmp/system_files/retro-emulation/usr/. /usr/') < emulation.index('for tool in retro-emulation-setup')
 assert 'test -s /usr/share/retro-os/esde/splash.svg' in emulation
 assert 'bash /ctx/tools/install-retro-utilities.sh' in emulation
+assert 'bash /ctx/tools/install-xbox-eeprom-editor.sh' in emulation
+packages = Path('build_files/04-install-packages.sh').read_text()
+for package in ('mono-core', 'mono-winforms', 'xorriso'):
+    assert ('    ' + package + ' '+chr(92)) in packages
+xbox = Path('build_files/tools/install-xbox-eeprom-editor.sh').read_text()
+assert "version='1.0.0.1'" in xbox
+assert 'unzip -tq "$archive"' in xbox
+assert 'exec /usr/bin/mono /usr/libexec/retro-os/XboxEepromEditor/XboxEepromEditor.exe' in xbox
+assert 'state_home="${XDG_STATE_HOME:-$HOME/.local/state}"' in xbox
+assert 'astra-xbox-eeprom-editor.desktop' in xbox
 installer = Path('build_files/tools/install-retro-utilities.sh').read_text()
 assert 'sha256sum -c -' in installer
 for project in ('Redrrx/ps3dec', 'RainbowCookie32/rusty-psn', 'Gemba/skyscraper'):

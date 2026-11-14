@@ -67,6 +67,8 @@ dnf5 -y install \
     lshw \
     lzip \
     mesa-vulkan-drivers \
+    mono-core \
+    mono-winforms \
     msedit \
     NetworkManager \
     openrgb-udev-rules \
@@ -88,6 +90,7 @@ dnf5 -y install \
     v4l-utils \
     vim \
     vulkan-tools \
+    xorriso \
     wireplumber \
     yad \
     ydotool \
