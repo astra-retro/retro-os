@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
-bash -n build_files/build.sh build_files/05-retro-emulation.sh build_files/06-finalize.sh build_files/tools/install-retro-utilities.sh build_files/tools/install-extracted-appdir.sh
+bash -n build_files/build.sh build_files/05-retro-emulation.sh build_files/06-finalize.sh build_files/tools/install-retro-utilities.sh build_files/tools/install-extracted-appdir.sh build_files/tools/install-xbox-eeprom-editor.sh
 python3 - <<'PY'
 from pathlib import Path
 source = Path('build_files/build.sh').read_text()
@@ -12,6 +12,32 @@ emulation = Path('build_files/05-retro-emulation.sh').read_text()
 assert emulation.index('cp --archive --verbose --force /tmp/system_files/retro-emulation/usr/. /usr/') < emulation.index('for tool in retro-emulation-setup')
 assert 'test -s /usr/share/retro-os/esde/splash.svg' in emulation
 assert 'bash /ctx/tools/install-retro-utilities.sh' in emulation
+assert 'bash /ctx/tools/install-xbox-eeprom-editor.sh' in emulation
+# Check the PS3 ISO tools are built reproducibly and copied into immutable
+# /usr without adding a compiler to the running OS image.
+containerfile = Path('Containerfile').read_text()
+assert 'FROM registry.fedoraproject.org/fedora:${FEDORA_VERSION} AS ps3iso-utils-builder' in containerfile
+assert 'ARG PS3ISO_UTILS_COMMIT=878090980a9042c61901920fed1b034af215e8c7' in containerfile
+assert 'git -C /tmp/ps3iso-utils checkout --quiet --detach "${PS3ISO_UTILS_COMMIT}"' in containerfile
+assert 'git -C /tmp/ps3iso-utils rev-parse HEAD' in containerfile
+assert 'for tool in extractps3iso makeps3iso patchps3iso splitps3iso; do' in containerfile
+assert 'make -C "/tmp/ps3iso-utils/${tool}"' in containerfile
+assert 'install -D -m 0755 "/tmp/ps3iso-utils/${tool}/${tool}" "/out/bin/${tool}"' in containerfile
+assert 'COPY --from=ps3iso-utils-builder /out/bin/ /usr/bin/' in containerfile
+assert 'COPY --from=ps3iso-utils-builder /out/share/licenses/ps3iso-utils/ /usr/share/licenses/ps3iso-utils/' in containerfile
+assert containerfile.index('COPY --from=ps3iso-utils-builder /out/bin/') < containerfile.index('bootc container lint')
+assert Path('docs/ps3iso-utils.md').is_file()
+packages = Path('build_files/04-install-packages.sh').read_text()
+for package in ('mono-core', 'mono-winforms', 'xorriso', 'mame-tools'):
+    assert ('    ' + package + ' '+chr(92)) in packages
+assert 'rpm -q mame-tools' in packages
+assert 'test -x /usr/bin/chdman' in packages
+xbox = Path('build_files/tools/install-xbox-eeprom-editor.sh').read_text()
+assert "version='1.0.0.1'" in xbox
+assert 'unzip -tq "$archive"' in xbox
+assert 'exec /usr/bin/mono /usr/libexec/retro-os/XboxEepromEditor/XboxEepromEditor.exe' in xbox
+assert 'state_home="${XDG_STATE_HOME:-$HOME/.local/state}"' in xbox
+assert 'astra-xbox-eeprom-editor.desktop' in xbox
 installer = Path('build_files/tools/install-retro-utilities.sh').read_text()
 assert 'sha256sum -c -' in installer
 for project in ('Redrrx/ps3dec', 'RainbowCookie32/rusty-psn', 'Gemba/skyscraper'):

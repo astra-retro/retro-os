@@ -12,6 +12,20 @@ FROM ghcr.io/ublue-os/akmods:${KERNEL_FLAVOR}-${FEDORA_VERSION}-${KERNEL_VERSION
 FROM ghcr.io/ublue-os/akmods-extra:${KERNEL_FLAVOR}-${FEDORA_VERSION}-${KERNEL_VERSION} AS akmods-extra
 FROM ghcr.io/ublue-os/akmods-${NVIDIA_FLAVOR}:${KERNEL_FLAVOR}-${FEDORA_VERSION}-${KERNEL_VERSION} AS akmods-nvidia
 
+# Build all four native PS3 ISO tools from one immutable upstream revision.
+# Keep gcc, make and git in a throwaway build stage, not the installed OS.
+FROM registry.fedoraproject.org/fedora:${FEDORA_VERSION} AS ps3iso-utils-builder
+ARG PS3ISO_UTILS_COMMIT=878090980a9042c61901920fed1b034af215e8c7
+RUN dnf5 -y install --setopt=install_weak_deps=False git gcc make \
+    && git clone --quiet https://github.com/bucanero/ps3iso-utils.git /tmp/ps3iso-utils \
+    && git -C /tmp/ps3iso-utils checkout --quiet --detach "${PS3ISO_UTILS_COMMIT}" \
+    && test "$(git -C /tmp/ps3iso-utils rev-parse HEAD)" = "${PS3ISO_UTILS_COMMIT}" \
+    && for tool in extractps3iso makeps3iso patchps3iso splitps3iso; do \
+         make -C "/tmp/ps3iso-utils/${tool}"; \
+         install -D -m 0755 "/tmp/ps3iso-utils/${tool}/${tool}" "/out/bin/${tool}"; \
+       done \
+    && install -D -m 0644 /tmp/ps3iso-utils/LICENSE /out/share/licenses/ps3iso-utils/LICENSE
+
 FROM scratch AS branding_assets
 COPY branding /
 
@@ -61,6 +75,13 @@ RUN --mount=type=cache,dst=/var/cache \
       && /ctx/build-initramfs.sh \
       && /ctx/finalize.sh \
       && /ctx/cleanup.sh
+
+# Ship only the binaries and GPL license; no compiler or build-time git.
+COPY --from=ps3iso-utils-builder /out/bin/ /usr/bin/
+COPY --from=ps3iso-utils-builder /out/share/licenses/ps3iso-utils/ /usr/share/licenses/ps3iso-utils/
+RUN for tool in extractps3iso makeps3iso patchps3iso splitps3iso; do \
+      test -x "/usr/bin/${tool}" || exit 1; \
+    done
 
 RUN --mount=type=tmpfs,target=/run \
       --network=none \

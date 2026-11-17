@@ -34,4 +34,8 @@ ln -sfn ../retro-emulation-setup.service \
 # Build-time installation only: no network fetch on the installed system.
 bash /ctx/tools/install-retro-utilities.sh
 
+# Original Xbox EEPROM Editor: Windows Forms binary run locally with Mono.
+# Download only when building the OCI; ship the app in immutable /usr.
+bash /ctx/tools/install-xbox-eeprom-editor.sh
+
 # Fedora Atomic /etc is mutable; do not persist user config in the build image.
