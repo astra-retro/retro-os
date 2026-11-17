@@ -28,8 +28,10 @@ assert 'COPY --from=ps3iso-utils-builder /out/share/licenses/ps3iso-utils/ /usr/
 assert containerfile.index('COPY --from=ps3iso-utils-builder /out/bin/') < containerfile.index('bootc container lint')
 assert Path('docs/ps3iso-utils.md').is_file()
 packages = Path('build_files/04-install-packages.sh').read_text()
-for package in ('mono-core', 'mono-winforms', 'xorriso'):
+for package in ('mono-core', 'mono-winforms', 'xorriso', 'mame-tools'):
     assert ('    ' + package + ' '+chr(92)) in packages
+assert 'rpm -q mame-tools' in packages
+assert 'test -x /usr/bin/chdman' in packages
 xbox = Path('build_files/tools/install-xbox-eeprom-editor.sh').read_text()
 assert "version='1.0.0.1'" in xbox
 assert 'unzip -tq "$archive"' in xbox
