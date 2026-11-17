@@ -66,6 +66,7 @@ dnf5 -y install \
     lsb_release \
     lshw \
     lzip \
+    mame-tools \
     mesa-vulkan-drivers \
     mono-core \
     mono-winforms \
@@ -95,6 +96,10 @@ dnf5 -y install \
     yad \
     ydotool \
     zenity
+
+# chdman is distributed in Fedora's mame-tools package, not separately.
+rpm -q mame-tools
+test -x /usr/bin/chdman
 
 # Fedora 45 ships OpenSSL 4 as openssl-libs; native emulators such as
 # Ryujinx/Ryubing may still need the OpenSSL 3 ABI (libssl.so.3).
