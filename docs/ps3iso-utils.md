@@ -30,6 +30,17 @@ Upstream also accepts `/?` for usage details. Note that these are CLI tools:
 there is no GNOME desktop launcher. Each command acts on files explicitly
 provided by the user.
 
+## CHD image utility (chdman)
+
+The image also installs Fedora's `mame-tools` RPM, which provides
+`/usr/bin/chdman`. Unlike the PS3 ISO tools above, `chdman` is maintained
+through the distribution package manager rather than compiled from source.
+
+It can create, extract, convert and verify CHD disk images. Run
+`chdman -help` for supported subcommands and options. Installation is checked
+at OCI build time with `rpm -q mame-tools` and `test -x /usr/bin/chdman`.
+No runtime downloads or separate installer are needed.
+
 ## Build verification
 
 Run `bash build_files/test-emulation-build-order.sh` to verify the build
